@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { config } from './config.js';
 
 // Game state
 let scene, camera, renderer;
@@ -7,6 +8,7 @@ let player, playerMixer;
 let ground = [];
 let obstacles = [];
 let coins = [];
+let blockchainBlocks = []; // Track blockchain-generated blocks separately
 let gameSpeed = 0.2;
 let score = 0;
 let ethCollected = 0;
@@ -425,19 +427,66 @@ function update(deltaTime) {
                     minZ = g.position.z;
                 }
             });
+            // Before recycling, detach any blockchain blocks from this segment
+            const blocksOnThisSegment = blockchainBlocks.filter(block => block.segmentGroup === segment);
+            blocksOnThisSegment.forEach(block => {
+                // Get the world position before detaching
+                const worldPos = new THREE.Vector3();
+                block.mesh.getWorldPosition(worldPos);
+
+                // Remove from segment
+                segment.remove(block.mesh);
+
+                // Add directly to scene with world position
+                block.mesh.position.copy(worldPos);
+                scene.add(block.mesh);
+
+                // Update segment reference to null so we know it's detached
+                block.segmentGroup = null;
+            });
+
             segment.position.z = minZ - GROUND_LENGTH;
 
-            // Remove old obstacles and coins associated with this segment
-            obstacles = obstacles.filter(obs => obs.segmentGroup !== segment);
+            // Remove old obstacles and coins associated with this segment (but keep blockchain blocks)
+            obstacles = obstacles.filter(obs => {
+                if (obs.segmentGroup === segment && !obs.isBlockchainBlock) {
+                    return false; // Remove regular obstacles
+                }
+                return true; // Keep blockchain blocks and other segments' obstacles
+            });
             coins = coins.filter(coin => coin.segmentGroup !== segment);
 
-            // Clear old obstacles and coins from the segment
+            // Also clean up blockchain blocks that passed (behind player)
+            blockchainBlocks = blockchainBlocks.filter(block => {
+                const worldPos = new THREE.Vector3();
+                block.mesh.getWorldPosition(worldPos);
+                // Remove if it's far behind the player
+                if (worldPos.z > player.position.z + 30) {
+                    block.segmentGroup.remove(block.mesh);
+                    obstacles = obstacles.filter(obs => obs !== block);
+                    return false;
+                }
+                return true;
+            });
+
+            // Clear old obstacles and coins from the segment, but keep blockchain blocks and ground/walls
             const objectsToRemove = [];
             segment.children.forEach(child => {
-                // Remove red obstacles (BoxGeometry) and coin groups
-                if ((child.geometry && child.geometry.type === 'BoxGeometry' && child.material.color.getHex() === 0xff0000) ||
-                    (child.isGroup && child.children.length > 0 && child.children[0].geometry && child.children[0].geometry.type === 'ConeGeometry')) {
-                    objectsToRemove.push(child);
+                // Check if this is a blockchain block
+                const isBlockchainBlock = blockchainBlocks.some(block => block.mesh === child);
+
+                // Check if this is ground or wall (brown colors)
+                const isGroundOrWall = child.material && (
+                    child.material.color.getHex() === 0x8B7355 || // ground
+                    child.material.color.getHex() === 0x654321    // walls
+                );
+
+                if (!isBlockchainBlock && !isGroundOrWall) {
+                    // Remove red obstacles (BoxGeometry) and coin groups (ConeGeometry groups)
+                    if ((child.geometry && child.geometry.type === 'BoxGeometry') ||
+                        (child.isGroup && child.children.length > 0 && child.children[0].geometry && child.children[0].geometry.type === 'ConeGeometry')) {
+                        objectsToRemove.push(child);
+                    }
                 }
             });
             objectsToRemove.forEach(obj => segment.remove(obj));
@@ -580,6 +629,7 @@ window.restartGame = function() {
 
     obstacles = [];
     coins = [];
+    blockchainBlocks = [];
 
     // Reset ground segments
     ground.forEach(segment => {
@@ -615,9 +665,57 @@ window.restartGame = function() {
     document.getElementById('score').textContent = 'Score: 0';
 }
 
+// Spawn a blue block obstacle when a new blockchain block is detected
+function spawnBlockObstacle() {
+    if (!player || gameOver) return;
+
+    // Find the furthest ground segment (at the back of the track)
+    let furthestSegment = ground[0];
+    let minZ = ground[0].position.z;
+
+    ground.forEach(segment => {
+        if (segment.position.z < minZ) {
+            minZ = segment.position.z;
+            furthestSegment = segment;
+        }
+    });
+
+    // Load base.png texture
+    const textureLoader = new THREE.TextureLoader();
+    const baseTexture = textureLoader.load('base.png');
+    baseTexture.colorSpace = THREE.SRGBColorSpace;
+
+    // Create blue block with Base logo texture using MeshBasicMaterial to preserve colors
+    const blockGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
+    const blockMaterial = new THREE.MeshBasicMaterial({
+        map: baseTexture
+    });
+    const blockObstacle = new THREE.Mesh(blockGeometry, blockMaterial);
+
+    // Random lane, but at the back portion of the furthest segment
+    const laneidx = Math.floor(Math.random() * 3);
+    const blockZ = -GROUND_LENGTH/4 - Math.random() * (GROUND_LENGTH/4);
+    blockObstacle.position.set(lanes[laneidx], 1, blockZ);
+    blockObstacle.castShadow = true;
+    blockObstacle.receiveShadow = true;
+
+    furthestSegment.add(blockObstacle);
+
+    // Track as both an obstacle and a blockchain block
+    const blockData = {
+        mesh: blockObstacle,
+        segmentGroup: furthestSegment,
+        isBlockchainBlock: true
+    };
+    obstacles.push(blockData);
+    blockchainBlocks.push(blockData);
+
+    console.log('Blue block spawned at lane', laneidx, 'on furthest segment at z:', minZ);
+}
+
 // WebSocket connection to listen for new blocks on Base
 function setupBlockListener() {
-    const ws = new WebSocket('wss://base-mainnet.g.alchemy.com/v2/wVzdvwQWSkf6DObBafMZA');
+    const ws = new WebSocket(`wss://base-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
 
     ws.onopen = () => {
         console.log('Connected to Base mainnet WebSocket');
@@ -651,6 +749,9 @@ function setupBlockListener() {
                 timestamp: parseInt(blockData.timestamp, 16),
                 miner: blockData.miner
             });
+
+            // Spawn a blue block when new block detected
+            spawnBlockObstacle();
         }
     };
 

@@ -41,6 +41,7 @@ yarn.lock
 .env
 .env.local
 .env.*.local
+config.js
 
 # Build output
 dist/
