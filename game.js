@@ -9,6 +9,7 @@ let ground = [];
 let obstacles = [];
 let coins = [];
 let blockchainBlocks = []; // Track blockchain-generated blocks separately
+let matrixRain = []; // Falling matrix symbols
 let gameSpeed = 0.2;
 let score = 0;
 let ethCollected = 0;
@@ -35,10 +36,10 @@ const PLAYER_Y_OFFSET = 0;
 
 // Initialize the game
 function init() {
-    // Scene setup
+    // Scene setup - Cyberpunk dark theme
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
-    scene.fog = new THREE.Fog(0x87CEEB, 10, 100);
+    scene.background = new THREE.Color(0x0a0a1a); // Dark purple/blue
+    scene.fog = new THREE.Fog(0x0a0a1a, 10, 100);
 
     // Camera setup
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -98,8 +99,58 @@ function init() {
     // Setup game over screen 3D model
     setupGameOverModel();
 
+    // Create subtle matrix rain
+    createMatrixRain();
+
     // Start animation loop
     animate();
+}
+
+// Create subtle falling matrix symbols
+function createMatrixRain() {
+    const matrixChars = ['0', '1', 'ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク'];
+
+    // Create only 15 symbols for subtlety
+    for (let i = 0; i < 15; i++) {
+        // Create canvas for each symbol
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+
+        // Draw glowing green character
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 48px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        ctx.fillText(char, 32, 32);
+
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+
+        // Create sprite material
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.4
+        });
+
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(0.5, 0.5, 1);
+
+        // Random position across the track width and height
+        sprite.position.x = (Math.random() - 0.5) * 12;
+        sprite.position.y = Math.random() * 8 + 5;
+        sprite.position.z = (Math.random() - 0.5) * 40;
+
+        // Random fall speed
+        sprite.userData.fallSpeed = 0.02 + Math.random() * 0.03;
+        sprite.userData.startY = sprite.position.y;
+
+        scene.add(sprite);
+        matrixRain.push(sprite);
+    }
 }
 
 // Setup the game over screen 3D model display
@@ -273,60 +324,53 @@ function createGroundSegment(zPos, skipObstacles = false) {
     const group = new THREE.Group();
     group.position.z = zPos; // Set the group's position, not the individual meshes
 
-    // Main ground
+    // Main ground - Cyberpunk grid with large squares
     const groundGeometry = new THREE.BoxGeometry(GROUND_WIDTH, 0.5, GROUND_LENGTH);
+
+    // Create grid texture for ground
+    const groundCanvas = document.createElement('canvas');
+    groundCanvas.width = 512;
+    groundCanvas.height = 512;
+    const groundCtx = groundCanvas.getContext('2d');
+
+    // Dark base
+    groundCtx.fillStyle = '#0a0a0a';
+    groundCtx.fillRect(0, 0, 512, 512);
+
+    // Neon cyan grid lines - larger squares
+    groundCtx.strokeStyle = '#00ffff';
+    groundCtx.lineWidth = 3;
+    const gridSize = 64; // Increased from 32 to 64 for larger squares
+
+    for (let i = 0; i <= 512; i += gridSize) {
+        groundCtx.beginPath();
+        groundCtx.moveTo(i, 0);
+        groundCtx.lineTo(i, 512);
+        groundCtx.stroke();
+
+        groundCtx.beginPath();
+        groundCtx.moveTo(0, i);
+        groundCtx.lineTo(512, i);
+        groundCtx.stroke();
+    }
+
+    const groundTexture = new THREE.CanvasTexture(groundCanvas);
+    groundTexture.wrapS = THREE.RepeatWrapping;
+    groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(2, 4);
+
     const groundMaterial = new THREE.MeshPhongMaterial({
-        color: 0x8B7355,
-        flatShading: true
+        map: groundTexture,
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.2,
+        color: 0x00ffff
     });
     const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
-    groundMesh.position.set(0, -0.25, 0); // Position relative to group
+    groundMesh.position.set(0, -0.25, 0);
     groundMesh.receiveShadow = true;
     group.add(groundMesh);
 
-    // Side walls
-    const wallGeometry = new THREE.BoxGeometry(1, 3, GROUND_LENGTH);
-    const wallMaterial = new THREE.MeshPhongMaterial({ color: 0x654321 });
-
-    const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
-    leftWall.position.set(-GROUND_WIDTH/2 - 0.5, 1.5, 0); // Position relative to group
-    leftWall.castShadow = true;
-    leftWall.receiveShadow = true;
-    group.add(leftWall);
-
-    const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
-    rightWall.position.set(GROUND_WIDTH/2 + 0.5, 1.5, 0); // Position relative to group
-    rightWall.castShadow = true;
-    rightWall.receiveShadow = true;
-    group.add(rightWall);
-
-    // Add obstacles randomly (but not if skipObstacles is true)
-    if (!skipObstacles && Math.random() < 0.7) {
-        const obstacleCount = Math.floor(Math.random() * 2) + 1;
-        const usedLanes = new Set();
-
-        for (let i = 0; i < obstacleCount; i++) {
-            let laneidx;
-            do {
-                laneidx = Math.floor(Math.random() * 3);
-            } while (usedLanes.has(laneidx));
-            usedLanes.add(laneidx);
-
-            const obstacleGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
-            const obstacleMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-            const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
-            // Place obstacles in the back portion of the segment (negative Z)
-            const obstacleZ = -GROUND_LENGTH/4 - Math.random() * (GROUND_LENGTH/4);
-            obstacle.position.set(lanes[laneidx], 1, obstacleZ);
-            obstacle.castShadow = true;
-            obstacle.receiveShadow = true;
-            group.add(obstacle);
-            obstacles.push({
-                mesh: obstacle,
-                segmentGroup: group
-            });
-        }
-    }
+    // Red obstacles removed - only blockchain blocks spawn now
 
     // Add coins (but not if skipObstacles is true)
     if (!skipObstacles) {
@@ -475,13 +519,10 @@ function update(deltaTime) {
                 // Check if this is a blockchain block
                 const isBlockchainBlock = blockchainBlocks.some(block => block.mesh === child);
 
-                // Check if this is ground or wall (brown colors)
-                const isGroundOrWall = child.material && (
-                    child.material.color.getHex() === 0x8B7355 || // ground
-                    child.material.color.getHex() === 0x654321    // walls
-                );
+                // Check if this is ground (cyan grid)
+                const isGround = child.material && child.material.color.getHex() === 0x00ffff;
 
-                if (!isBlockchainBlock && !isGroundOrWall) {
+                if (!isBlockchainBlock && !isGround) {
                     // Remove red obstacles (BoxGeometry) and coin groups (ConeGeometry groups)
                     if ((child.geometry && child.geometry.type === 'BoxGeometry') ||
                         (child.isGroup && child.children.length > 0 && child.children[0].geometry && child.children[0].geometry.type === 'ConeGeometry')) {
@@ -491,32 +532,7 @@ function update(deltaTime) {
             });
             objectsToRemove.forEach(obj => segment.remove(obj));
 
-            // Add new obstacles
-            if (Math.random() < 0.7) {
-                const obstacleCount = Math.floor(Math.random() * 2) + 1;
-                const usedLanes = new Set();
-
-                for (let i = 0; i < obstacleCount; i++) {
-                    let laneidx;
-                    do {
-                        laneidx = Math.floor(Math.random() * 3);
-                    } while (usedLanes.has(laneidx));
-                    usedLanes.add(laneidx);
-
-                    const obstacleGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
-                    const obstacleMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-                    const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
-                    // Place obstacles in the back portion of the segment (negative Z)
-                    const obstacleZ = -GROUND_LENGTH/4 - Math.random() * (GROUND_LENGTH/4);
-                    obstacle.position.set(lanes[laneidx], 1, obstacleZ);
-                    obstacle.castShadow = true;
-                    segment.add(obstacle);
-                    obstacles.push({
-                        mesh: obstacle,
-                        segmentGroup: segment
-                    });
-                }
-            }
+            // Red obstacles removed - only blockchain blocks spawn now
 
             // Add new coins
             const coinCount = Math.floor(Math.random() * 3) + 1;
@@ -541,6 +557,18 @@ function update(deltaTime) {
         // Gentle bobbing motion
         const baseY = 1.5;
         coinObj.mesh.position.y = baseY + Math.sin(Date.now() * 0.003 + coinObj.mesh.position.x) * 0.1;
+    });
+
+    // Animate matrix rain symbols
+    matrixRain.forEach(sprite => {
+        sprite.position.y -= sprite.userData.fallSpeed;
+
+        // Reset to top when it falls below ground
+        if (sprite.position.y < -1) {
+            sprite.position.y = sprite.userData.startY;
+            sprite.position.x = (Math.random() - 0.5) * 12;
+            sprite.position.z = (Math.random() - 0.5) * 40;
+        }
     });
 
     // Check collision with obstacles and track passed obstacles
@@ -621,10 +649,24 @@ function endGame() {
 window.restartGame = function() {
     // Remove all obstacles and coins
     obstacles.forEach(obsObj => {
-        obsObj.segmentGroup.remove(obsObj.mesh);
+        if (obsObj.segmentGroup) {
+            obsObj.segmentGroup.remove(obsObj.mesh);
+        } else {
+            // If detached from segment, remove from scene
+            scene.remove(obsObj.mesh);
+        }
     });
     coins.forEach(coinObj => {
         coinObj.segmentGroup.remove(coinObj.mesh);
+    });
+
+    // Remove all blockchain blocks (some may be detached)
+    blockchainBlocks.forEach(block => {
+        if (block.segmentGroup) {
+            block.segmentGroup.remove(block.mesh);
+        } else {
+            scene.remove(block.mesh);
+        }
     });
 
     obstacles = [];
@@ -665,8 +707,8 @@ window.restartGame = function() {
     document.getElementById('score').textContent = 'Score: 0';
 }
 
-// Spawn a blue block obstacle when a new blockchain block is detected
-function spawnBlockObstacle() {
+// Spawn a blockchain block obstacle when a new blockchain block is detected
+function spawnBlockObstacle(blockType = 'base') {
     if (!player || gameOver) return;
 
     // Find the furthest ground segment (at the back of the track)
@@ -680,21 +722,63 @@ function spawnBlockObstacle() {
         }
     });
 
-    // Load base.png texture
-    const textureLoader = new THREE.TextureLoader();
-    const baseTexture = textureLoader.load('base.png');
-    baseTexture.colorSpace = THREE.SRGBColorSpace;
+    // Find available lane - check for overlapping blocks
+    const availableLanes = [0, 1, 2];
+    const blockZ = -GROUND_LENGTH/4 - Math.random() * (GROUND_LENGTH/4);
+    const minDistance = 3; // Minimum distance between blocks
 
-    // Create blue block with Base logo texture using MeshBasicMaterial to preserve colors
+    // Check all blockchain blocks to avoid overlaps
+    blockchainBlocks.forEach(existingBlock => {
+        const worldPos = new THREE.Vector3();
+        existingBlock.mesh.getWorldPosition(worldPos);
+
+        // Check each lane to see if it's too close to existing blocks
+        for (let i = availableLanes.length - 1; i >= 0; i--) {
+            const laneX = lanes[availableLanes[i]];
+            const distance = Math.sqrt(
+                Math.pow(laneX - worldPos.x, 2) +
+                Math.pow(furthestSegment.position.z + blockZ - worldPos.z, 2)
+            );
+
+            // Remove lane if too close to existing block
+            if (distance < minDistance) {
+                availableLanes.splice(i, 1);
+            }
+        }
+    });
+
+    // If no available lanes, don't spawn
+    if (availableLanes.length === 0) {
+        console.log(`${blockType.toUpperCase()} block spawn skipped - no available lanes`);
+        return;
+    }
+
+    // Pick a random available lane
+    const laneidx = availableLanes[Math.floor(Math.random() * availableLanes.length)];
+
+    // Load appropriate texture based on block type
+    const textureLoader = new THREE.TextureLoader();
+    let texturePath;
+    if (blockType === 'op') {
+        texturePath = 'op.png';
+    } else if (blockType === 'eth') {
+        texturePath = 'eth.png';
+    } else if (blockType === 'arb') {
+        texturePath = 'arb.png';
+    } else {
+        texturePath = 'base.png';
+    }
+    const blockTexture = textureLoader.load(texturePath);
+    blockTexture.colorSpace = THREE.SRGBColorSpace;
+
+    // Create white block with blockchain logo texture using MeshBasicMaterial to preserve colors
     const blockGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
     const blockMaterial = new THREE.MeshBasicMaterial({
-        map: baseTexture
+        map: blockTexture,
+        color: 0xffffff // White base color
     });
     const blockObstacle = new THREE.Mesh(blockGeometry, blockMaterial);
 
-    // Random lane, but at the back portion of the furthest segment
-    const laneidx = Math.floor(Math.random() * 3);
-    const blockZ = -GROUND_LENGTH/4 - Math.random() * (GROUND_LENGTH/4);
     blockObstacle.position.set(lanes[laneidx], 1, blockZ);
     blockObstacle.castShadow = true;
     blockObstacle.receiveShadow = true;
@@ -705,12 +789,13 @@ function spawnBlockObstacle() {
     const blockData = {
         mesh: blockObstacle,
         segmentGroup: furthestSegment,
-        isBlockchainBlock: true
+        isBlockchainBlock: true,
+        blockType: blockType
     };
     obstacles.push(blockData);
     blockchainBlocks.push(blockData);
 
-    console.log('Blue block spawned at lane', laneidx, 'on furthest segment at z:', minZ);
+    console.log(`${blockType.toUpperCase()} block spawned at lane`, laneidx, 'on furthest segment at z:', minZ);
 }
 
 // WebSocket connection to listen for new blocks on Base
@@ -760,13 +845,172 @@ function setupBlockListener() {
     };
 
     ws.onclose = () => {
-        console.log('WebSocket connection closed. Reconnecting in 5 seconds...');
+        console.log('Base WebSocket connection closed. Reconnecting in 5 seconds...');
         setTimeout(setupBlockListener, 5000);
+    };
+}
+
+// WebSocket connection to listen for new blocks on OP Mainnet
+function setupOPBlockListener() {
+    const ws = new WebSocket(`wss://opt-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
+
+    ws.onopen = () => {
+        console.log('Connected to OP Mainnet WebSocket');
+
+        // Subscribe to new block headers
+        const subscribeMessage = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'eth_subscribe',
+            params: ['newHeads']
+        });
+
+        ws.send(subscribeMessage);
+        console.log('Subscribed to OP new blocks');
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // Handle subscription confirmation
+        if (data.id === 2 && data.result) {
+            console.log('OP Subscription ID:', data.result);
+        }
+
+        // Handle new block notifications
+        if (data.method === 'eth_subscription') {
+            const blockData = data.params.result;
+            console.log('New OP block received!', {
+                blockNumber: parseInt(blockData.number, 16),
+                blockHash: blockData.hash,
+                timestamp: parseInt(blockData.timestamp, 16),
+                miner: blockData.miner
+            });
+
+            // Spawn an OP block when new block detected
+            spawnBlockObstacle('op');
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('OP WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+        console.log('OP WebSocket connection closed. Reconnecting in 5 seconds...');
+        setTimeout(setupOPBlockListener, 5000);
+    };
+}
+
+// WebSocket connection to listen for new blocks on Ethereum Mainnet
+function setupETHBlockListener() {
+    const ws = new WebSocket(`wss://eth-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
+
+    ws.onopen = () => {
+        console.log('Connected to Ethereum Mainnet WebSocket');
+
+        // Subscribe to new block headers
+        const subscribeMessage = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'eth_subscribe',
+            params: ['newHeads']
+        });
+
+        ws.send(subscribeMessage);
+        console.log('Subscribed to ETH new blocks');
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // Handle subscription confirmation
+        if (data.id === 3 && data.result) {
+            console.log('ETH Subscription ID:', data.result);
+        }
+
+        // Handle new block notifications
+        if (data.method === 'eth_subscription') {
+            const blockData = data.params.result;
+            console.log('New ETH block received!', {
+                blockNumber: parseInt(blockData.number, 16),
+                blockHash: blockData.hash,
+                timestamp: parseInt(blockData.timestamp, 16),
+                miner: blockData.miner
+            });
+
+            // Spawn an ETH block when new block detected
+            spawnBlockObstacle('eth');
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('ETH WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+        console.log('ETH WebSocket connection closed. Reconnecting in 5 seconds...');
+        setTimeout(setupETHBlockListener, 5000);
+    };
+}
+
+// WebSocket connection to listen for new blocks on Arbitrum
+function setupARBBlockListener() {
+    const ws = new WebSocket(`wss://arb-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
+
+    ws.onopen = () => {
+        console.log('Connected to Arbitrum Mainnet WebSocket');
+
+        // Subscribe to new block headers
+        const subscribeMessage = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 4,
+            method: 'eth_subscribe',
+            params: ['newHeads']
+        });
+
+        ws.send(subscribeMessage);
+        console.log('Subscribed to ARB new blocks');
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // Handle subscription confirmation
+        if (data.id === 4 && data.result) {
+            console.log('ARB Subscription ID:', data.result);
+        }
+
+        // Handle new block notifications
+        if (data.method === 'eth_subscription') {
+            const blockData = data.params.result;
+            console.log('New ARB block received!', {
+                blockNumber: parseInt(blockData.number, 16),
+                blockHash: blockData.hash,
+                timestamp: parseInt(blockData.timestamp, 16),
+                miner: blockData.miner
+            });
+
+            // Spawn an ARB block when new block detected
+            spawnBlockObstacle('arb');
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('ARB WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+        console.log('ARB WebSocket connection closed. Reconnecting in 5 seconds...');
+        setTimeout(setupARBBlockListener, 5000);
     };
 }
 
 // Start the game
 init();
 
-// Setup block listener
-setupBlockListener();
+// Setup block listeners for all chains
+setupBlockListener();      // Base
+setupOPBlockListener();    // OP Mainnet
+setupETHBlockListener();   // Ethereum Mainnet
+setupARBBlockListener();   // Arbitrum
