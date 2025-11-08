@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temple Run Style Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #E0F6FF);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        #score {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 60px;
+            border-radius: 30px;
+            border: 3px solid #627EEA;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 100;
+            min-width: 700px;
+            min-height: 400px;
+        }
+
+        #gameOverContent {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        #gameOverModel {
+            width: 250px;
+            height: 450px;
+            flex-shrink: 0;
+            background: #1a1a2e;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #gameOverModel canvas {
+            display: block;
+        }
+
+        #gameOverText {
+            flex: 1;
+            text-align: left;
+        }
+
+        #gameOver h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #627EEA;
+            text-shadow: 0 0 20px rgba(98, 126, 234, 0.5);
+        }
+
+        #gameOver p {
+            font-size: 32px;
+            margin-bottom: 30px;
+            font-weight: bold;
+        }
+
+        #gameOver button {
+            font-size: 24px;
+            padding: 20px 50px;
+            background: #627EEA;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(98, 126, 234, 0.4);
+        }
+
+        #gameOver button:hover {
+            background: #4a5fc1;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(98, 126, 234, 0.6);
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            text-align: center;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="score">Score: 0</div>
+    </div>
+
+    <div id="gameOver">
+        <div id="gameOverContent">
+            <div id="gameOverModel"></div>
+            <div id="gameOverText">
+                <h1>Game Over!</h1>
+                <div id="scoreBreakdown" style="margin-bottom: 30px; font-size: 18px; line-height: 1.8;">
+                    <div style="margin-bottom: 10px;">
+                        <span style="color: #627EEA;">ETH Collected:</span> <span id="ethCount">0</span> × 100 = <span id="ethPoints">0</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <span style="color: #FF6B6B;">Blocks Passed:</span> <span id="obstaclesCount">0</span> × 100 = <span id="obstaclesPoints">0</span>
+                    </div>
+                    <div style="border-top: 2px solid #627EEA; padding-top: 10px; margin-top: 10px;">
+                        <strong style="font-size: 24px;">Total Score: <span id="finalScore">0</span></strong>
+                    </div>
+                </div>
+                <button onclick="restartGame()">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="instructions">
+        <p>Use ARROW KEYS to move left/right | SPACE to jump</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.139.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.139.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>
