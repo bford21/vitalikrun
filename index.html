@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Temple Run Style Game</title>
     <style>
         * {
@@ -178,6 +178,129 @@
             text-align: center;
             z-index: 10;
         }
+
+        #mobileControls {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .mobile-btn {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 255, 255, 0.3);
+            border: 3px solid #00ffff;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: all;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .mobile-btn:active {
+            background: rgba(0, 255, 255, 0.6);
+        }
+
+        #leftBtn {
+            bottom: 60px;
+            left: 40px;
+        }
+
+        #rightBtn {
+            bottom: 60px;
+            right: 40px;
+        }
+
+        #jumpBtn {
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 100px;
+        }
+
+        @media (max-width: 768px) {
+            #mobileControls {
+                display: block;
+            }
+
+            #instructions {
+                display: none;
+            }
+
+            #blockFeed {
+                display: none;
+            }
+
+            #ui {
+                top: 10px;
+                left: 10px;
+                font-size: 18px;
+            }
+
+            #gameOver {
+                padding: 20px;
+                min-width: 90%;
+                max-width: 90%;
+                min-height: auto;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+
+            #gameOverContent {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            #gameOverModel {
+                width: 150px;
+                height: 270px;
+            }
+
+            #gameOverText {
+                text-align: center;
+            }
+
+            #gameOver h1 {
+                font-size: 36px;
+                margin-bottom: 10px;
+            }
+
+            #gameOver p {
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
+
+            #scoreBreakdown {
+                font-size: 14px !important;
+                margin-bottom: 20px !important;
+            }
+
+            #scoreBreakdown div {
+                margin-bottom: 8px !important;
+            }
+
+            #scoreBreakdown strong {
+                font-size: 18px !important;
+            }
+
+            #gameOver button {
+                font-size: 18px;
+                padding: 15px 40px;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -213,6 +336,12 @@
 
     <div id="instructions">
         <p>Use ARROW KEYS to move left/right | SPACE to jump</p>
+    </div>
+
+    <div id="mobileControls">
+        <div id="leftBtn" class="mobile-btn">◄</div>
+        <div id="jumpBtn" class="mobile-btn">▲</div>
+        <div id="rightBtn" class="mobile-btn">►</div>
     </div>
 
     <script type="importmap">

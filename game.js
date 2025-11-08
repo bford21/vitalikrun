@@ -41,10 +41,12 @@ function init() {
     scene.background = new THREE.Color(0x0a0a1a); // Dark purple/blue
     scene.fog = new THREE.Fog(0x0a0a1a, 10, 100);
 
-    // Camera setup
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 4, 8);
-    camera.lookAt(0, 2, 0);
+    // Camera setup - pull back more to see all lanes, wider FOV for mobile
+    const isMobile = window.innerWidth <= 768;
+    const fov = isMobile ? 90 : 75; // Wider field of view on mobile
+    camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 6, 12); // Pull back and raise camera
+    camera.lookAt(0, 1, 0);
 
     // Renderer setup
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -95,6 +97,9 @@ function init() {
     // Event listeners
     window.addEventListener('resize', onWindowResize);
     document.addEventListener('keydown', onKeyDown);
+
+    // Mobile touch controls
+    setupMobileControls();
 
     // Setup game over screen 3D model
     setupGameOverModel();
@@ -162,14 +167,19 @@ function setupGameOverModel() {
     // Make scene background transparent so CSS background shows through
     gameOverScene.background = null;
 
-    // Camera for game over model - pull back and raise to show full head
-    gameOverCamera = new THREE.PerspectiveCamera(50, 250 / 450, 0.1, 100);
-    gameOverCamera.position.set(0, 1.5, 4.5);
-    gameOverCamera.lookAt(0, 1, 0);
+    // Check if mobile for responsive sizing
+    const isMobile = window.innerWidth <= 768;
+    const modelWidth = isMobile ? 150 : 250;
+    const modelHeight = isMobile ? 270 : 450;
+
+    // Camera for game over model - adjusted to show full character centered
+    gameOverCamera = new THREE.PerspectiveCamera(50, modelWidth / modelHeight, 0.1, 100);
+    gameOverCamera.position.set(0, 0.5, 5.5);
+    gameOverCamera.lookAt(0, 0.3, 0);
 
     // Renderer for game over model - fully transparent to use CSS background
     gameOverRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    gameOverRenderer.setSize(250, 450);
+    gameOverRenderer.setSize(modelWidth, modelHeight);
     gameOverRenderer.outputEncoding = THREE.sRGBEncoding;
     gameOverRenderer.setClearColor(0x000000, 0); // Transparent background
     container.appendChild(gameOverRenderer.domElement);
@@ -191,9 +201,9 @@ function setupGameOverModel() {
     loader.load('vitalik_buterin_idle.glb', (gltf) => {
         idleModel = gltf.scene;
 
-        // Position model to show full head and body
-        idleModel.position.set(0, -0.2, 0);
-        idleModel.scale.set(1, 1, 1);
+        // Position model to show full head and body - centered and lowered significantly
+        idleModel.position.set(0, -0.8, 0);
+        idleModel.scale.set(0.95, 0.95, 0.95);
 
         // Setup animation
         if (gltf.animations && gltf.animations.length > 0) {
@@ -420,8 +430,49 @@ function onKeyDown(event) {
     }
 }
 
+// Setup mobile touch controls
+function setupMobileControls() {
+    const leftBtn = document.getElementById('leftBtn');
+    const rightBtn = document.getElementById('rightBtn');
+    const jumpBtn = document.getElementById('jumpBtn');
+
+    if (leftBtn) {
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameOver && currentLane > 0) {
+                currentLane--;
+                targetLane = currentLane;
+            }
+        });
+    }
+
+    if (rightBtn) {
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameOver && currentLane < 2) {
+                currentLane++;
+                targetLane = currentLane;
+            }
+        });
+    }
+
+    if (jumpBtn) {
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameOver && !isJumping && player) {
+                isJumping = true;
+                jumpVelocity = JUMP_POWER;
+            }
+        });
+    }
+}
+
 // Handle window resize
 function onWindowResize() {
+    const isMobile = window.innerWidth <= 768;
+
+    // Adjust FOV for mobile
+    camera.fov = isMobile ? 90 : 75;
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -869,6 +920,9 @@ function setupBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
+            // Skip if game is over
+            if (gameOver) return;
+
             const blockHeader = data.params.result;
             const blockNumber = parseInt(blockHeader.number, 16);
 
@@ -943,6 +997,9 @@ function setupOPBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
+            // Skip if game is over
+            if (gameOver) return;
+
             const blockHeader = data.params.result;
             const blockNumber = parseInt(blockHeader.number, 16);
 
@@ -1017,6 +1074,9 @@ function setupETHBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
+            // Skip if game is over
+            if (gameOver) return;
+
             const blockHeader = data.params.result;
             const blockNumber = parseInt(blockHeader.number, 16);
 
@@ -1091,6 +1151,9 @@ function setupARBBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
+            // Skip if game is over
+            if (gameOver) return;
+
             const blockHeader = data.params.result;
             const blockNumber = parseInt(blockHeader.number, 16);
 
