@@ -38,6 +38,62 @@
             margin-bottom: 10px;
         }
 
+        #blockFeed {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+            width: 250px;
+            max-height: 400px;
+            overflow: hidden;
+        }
+
+        #blockFeed h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #00ffff;
+        }
+
+        .block-entry {
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 3px solid;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .block-entry.base { border-left-color: #0052ff; }
+        .block-entry.op { border-left-color: #ff0420; }
+        .block-entry.eth { border-left-color: #627eea; }
+        .block-entry.arb { border-left-color: #28a0f0; }
+
+        .block-chain {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        .block-txs {
+            font-size: 11px;
+            color: #00ff00;
+            margin-top: 2px;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
         #gameOver {
             position: absolute;
             top: 50%;
@@ -127,6 +183,11 @@
 <body>
     <div id="ui">
         <div id="score">Score: 0</div>
+    </div>
+
+    <div id="blockFeed">
+        <h3>Live Blocks</h3>
+        <div id="blockFeedEntries"></div>
     </div>
 
     <div id="gameOver">

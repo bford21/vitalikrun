@@ -707,9 +707,51 @@ window.restartGame = function() {
     document.getElementById('score').textContent = 'Score: 0';
 }
 
+// Add block to live feed
+function addBlockToFeed(blockType, txCount, blockNumber) {
+    const feedEntries = document.getElementById('blockFeedEntries');
+
+    // Create new entry
+    const entry = document.createElement('div');
+    entry.className = `block-entry ${blockType}`;
+
+    const chainName = blockType.toUpperCase();
+    entry.innerHTML = `
+        <div class="block-chain">${chainName} #${blockNumber}</div>
+        <div class="block-txs">${txCount} transaction${txCount !== 1 ? 's' : ''}</div>
+    `;
+
+    // Add to top of feed
+    feedEntries.insertBefore(entry, feedEntries.firstChild);
+
+    // Keep only last 8 entries
+    while (feedEntries.children.length > 8) {
+        feedEntries.removeChild(feedEntries.lastChild);
+    }
+}
+
 // Spawn a blockchain block obstacle when a new blockchain block is detected
-function spawnBlockObstacle(blockType = 'base') {
+function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
     if (!player || gameOver) return;
+
+    // Determine block size based on transaction count
+    let blockSize;
+    let blockHeight;
+    if (txCount <= 10) {
+        // Small block
+        blockSize = 0.8;
+        blockHeight = 1;
+    } else if (txCount <= 200) {
+        // Medium block
+        blockSize = 1.5;
+        blockHeight = 2;
+    } else {
+        // Large block
+        blockSize = 2.5;
+        blockHeight = 3;
+    }
+
+    console.log(`${blockType.toUpperCase()} block with ${txCount} transactions - size: ${blockSize}`);
 
     // Find the furthest ground segment (at the back of the track)
     let furthestSegment = ground[0];
@@ -772,14 +814,14 @@ function spawnBlockObstacle(blockType = 'base') {
     blockTexture.colorSpace = THREE.SRGBColorSpace;
 
     // Create white block with blockchain logo texture using MeshBasicMaterial to preserve colors
-    const blockGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
+    const blockGeometry = new THREE.BoxGeometry(blockSize, blockHeight, blockSize);
     const blockMaterial = new THREE.MeshBasicMaterial({
         map: blockTexture,
         color: 0xffffff // White base color
     });
     const blockObstacle = new THREE.Mesh(blockGeometry, blockMaterial);
 
-    blockObstacle.position.set(lanes[laneidx], 1, blockZ);
+    blockObstacle.position.set(lanes[laneidx], blockHeight / 2, blockZ);
     blockObstacle.castShadow = true;
     blockObstacle.receiveShadow = true;
 
@@ -805,7 +847,7 @@ function setupBlockListener() {
     ws.onopen = () => {
         console.log('Connected to Base mainnet WebSocket');
 
-        // Subscribe to new block headers
+        // Subscribe to new block headers (full transactions will be fetched separately)
         const subscribeMessage = JSON.stringify({
             jsonrpc: '2.0',
             id: 1,
@@ -817,26 +859,48 @@ function setupBlockListener() {
         console.log('Subscribed to new blocks');
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
 
         // Handle subscription confirmation
         if (data.id === 1 && data.result) {
-            console.log('Subscription ID:', data.result);
+            console.log('Base Subscription ID:', data.result);
         }
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
-            const blockData = data.params.result;
-            console.log('New block received!', {
-                blockNumber: parseInt(blockData.number, 16),
-                blockHash: blockData.hash,
-                timestamp: parseInt(blockData.timestamp, 16),
-                miner: blockData.miner
-            });
+            const blockHeader = data.params.result;
+            const blockNumber = parseInt(blockHeader.number, 16);
 
-            // Spawn a blue block when new block detected
-            spawnBlockObstacle();
+            // Fetch full block with transaction count via HTTP
+            try {
+                const response = await fetch(`https://base-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method: 'eth_getBlockByNumber',
+                        params: [blockHeader.number, false] // false = only tx hashes, not full tx data
+                    })
+                });
+                const blockData = await response.json();
+                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
+
+                console.log('New Base block received!', {
+                    blockNumber: blockNumber,
+                    blockHash: blockHeader.hash,
+                    txCount: txCount
+                });
+
+                // Add to feed
+                addBlockToFeed('base', txCount, blockNumber);
+
+                // Spawn a Base block when new block detected
+                spawnBlockObstacle('base', txCount, blockNumber);
+            } catch (error) {
+                console.error('Error fetching Base block data:', error);
+            }
         }
     };
 
@@ -869,7 +933,7 @@ function setupOPBlockListener() {
         console.log('Subscribed to OP new blocks');
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
 
         // Handle subscription confirmation
@@ -879,16 +943,38 @@ function setupOPBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
-            const blockData = data.params.result;
-            console.log('New OP block received!', {
-                blockNumber: parseInt(blockData.number, 16),
-                blockHash: blockData.hash,
-                timestamp: parseInt(blockData.timestamp, 16),
-                miner: blockData.miner
-            });
+            const blockHeader = data.params.result;
+            const blockNumber = parseInt(blockHeader.number, 16);
 
-            // Spawn an OP block when new block detected
-            spawnBlockObstacle('op');
+            // Fetch full block with transaction count via HTTP
+            try {
+                const response = await fetch(`https://opt-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 2,
+                        method: 'eth_getBlockByNumber',
+                        params: [blockHeader.number, false]
+                    })
+                });
+                const blockData = await response.json();
+                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
+
+                console.log('New OP block received!', {
+                    blockNumber: blockNumber,
+                    blockHash: blockHeader.hash,
+                    txCount: txCount
+                });
+
+                // Add to feed
+                addBlockToFeed('op', txCount, blockNumber);
+
+                // Spawn an OP block when new block detected
+                spawnBlockObstacle('op', txCount, blockNumber);
+            } catch (error) {
+                console.error('Error fetching OP block data:', error);
+            }
         }
     };
 
@@ -921,7 +1007,7 @@ function setupETHBlockListener() {
         console.log('Subscribed to ETH new blocks');
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
 
         // Handle subscription confirmation
@@ -931,16 +1017,38 @@ function setupETHBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
-            const blockData = data.params.result;
-            console.log('New ETH block received!', {
-                blockNumber: parseInt(blockData.number, 16),
-                blockHash: blockData.hash,
-                timestamp: parseInt(blockData.timestamp, 16),
-                miner: blockData.miner
-            });
+            const blockHeader = data.params.result;
+            const blockNumber = parseInt(blockHeader.number, 16);
 
-            // Spawn an ETH block when new block detected
-            spawnBlockObstacle('eth');
+            // Fetch full block with transaction count via HTTP
+            try {
+                const response = await fetch(`https://eth-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 3,
+                        method: 'eth_getBlockByNumber',
+                        params: [blockHeader.number, false]
+                    })
+                });
+                const blockData = await response.json();
+                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
+
+                console.log('New ETH block received!', {
+                    blockNumber: blockNumber,
+                    blockHash: blockHeader.hash,
+                    txCount: txCount
+                });
+
+                // Add to feed
+                addBlockToFeed('eth', txCount, blockNumber);
+
+                // Spawn an ETH block when new block detected
+                spawnBlockObstacle('eth', txCount, blockNumber);
+            } catch (error) {
+                console.error('Error fetching ETH block data:', error);
+            }
         }
     };
 
@@ -973,7 +1081,7 @@ function setupARBBlockListener() {
         console.log('Subscribed to ARB new blocks');
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
 
         // Handle subscription confirmation
@@ -983,16 +1091,38 @@ function setupARBBlockListener() {
 
         // Handle new block notifications
         if (data.method === 'eth_subscription') {
-            const blockData = data.params.result;
-            console.log('New ARB block received!', {
-                blockNumber: parseInt(blockData.number, 16),
-                blockHash: blockData.hash,
-                timestamp: parseInt(blockData.timestamp, 16),
-                miner: blockData.miner
-            });
+            const blockHeader = data.params.result;
+            const blockNumber = parseInt(blockHeader.number, 16);
 
-            // Spawn an ARB block when new block detected
-            spawnBlockObstacle('arb');
+            // Fetch full block with transaction count via HTTP
+            try {
+                const response = await fetch(`https://arb-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 4,
+                        method: 'eth_getBlockByNumber',
+                        params: [blockHeader.number, false]
+                    })
+                });
+                const blockData = await response.json();
+                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
+
+                console.log('New ARB block received!', {
+                    blockNumber: blockNumber,
+                    blockHash: blockHeader.hash,
+                    txCount: txCount
+                });
+
+                // Add to feed
+                addBlockToFeed('arb', txCount, blockNumber);
+
+                // Spawn an ARB block when new block detected
+                spawnBlockObstacle('arb', txCount, blockNumber);
+            } catch (error) {
+                console.error('Error fetching ARB block data:', error);
+            }
         }
     };
 
