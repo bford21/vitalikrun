@@ -75,12 +75,23 @@ function init() {
     camera.position.set(0, 6, 12); // Pull back and raise camera
     camera.lookAt(0, 1, 0);
 
-    // Renderer setup
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Renderer setup - optimize for mobile performance
+    renderer = new THREE.WebGLRenderer({
+        antialias: !isMobile, // Disable antialiasing on mobile for better performance
+        powerPreference: isMobile ? 'low-power' : 'high-performance'
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace; // Ensure proper color rendering
+
+    // Lower pixel ratio on mobile for better performance
+    renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio);
+
+    // Optimize shadow settings for mobile
+    renderer.shadowMap.enabled = !isMobile; // Disable shadows on mobile
+    if (!isMobile) {
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
+
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     document.body.appendChild(renderer.domElement);
@@ -91,16 +102,19 @@ function init() {
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
     directionalLight.position.set(5, 10, 5);
-    directionalLight.castShadow = true;
-    // Expand shadow camera to cover the entire visible path
-    directionalLight.shadow.camera.left = -20;
-    directionalLight.shadow.camera.right = 20;
-    directionalLight.shadow.camera.top = 20;
-    directionalLight.shadow.camera.bottom = -20;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 150; // Extend far distance to cover entire path
-    directionalLight.shadow.mapSize.width = 2048; // Higher resolution shadows
-    directionalLight.shadow.mapSize.height = 2048;
+
+    // Only enable shadows on desktop
+    if (!isMobile) {
+        directionalLight.castShadow = true;
+        directionalLight.shadow.camera.left = -20;
+        directionalLight.shadow.camera.right = 20;
+        directionalLight.shadow.camera.top = 20;
+        directionalLight.shadow.camera.bottom = -20;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 150;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+    }
     scene.add(directionalLight);
 
     // Add a fill light to brighten the character
@@ -137,10 +151,14 @@ function init() {
 
 // Create subtle falling matrix symbols
 function createMatrixRain() {
+    const isMobile = window.innerWidth <= 768;
+
+    // Reduce matrix rain on mobile for better performance
+    const symbolCount = isMobile ? 5 : 15;
+
     const matrixChars = ['0', '1', 'ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク'];
 
-    // Create only 15 symbols for subtlety
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < symbolCount; i++) {
         // Create canvas for each symbol
         const canvas = document.createElement('canvas');
         canvas.width = 64;
@@ -184,6 +202,7 @@ function createMatrixRain() {
 
 // Load the player GLB model
 function loadPlayer() {
+    const isMobile = window.innerWidth <= 768;
     const loader = new GLTFLoader();
     loader.load('/vitalik_buterin_running.glb', (gltf) => {
         player = gltf.scene;
@@ -196,8 +215,9 @@ function loadPlayer() {
         // Enable shadows and ensure materials/textures are properly configured
         player.traverse((node) => {
             if (node.isMesh) {
-                node.castShadow = true;
-                node.receiveShadow = true;
+                // Only enable shadows on desktop
+                node.castShadow = !isMobile;
+                node.receiveShadow = !isMobile;
 
                 // Debug: Log material info
                 console.log('Mesh:', node.name, 'Material:', node.material);
@@ -262,11 +282,12 @@ function loadBackwardPlayer() {
         backwardPlayer.position.set(lanes[currentLane], PLAYER_Y_OFFSET, 5);
         backwardPlayer.rotation.y = Math.PI;
 
-        // Enable shadows
+        // Enable shadows (desktop only for performance)
+        const isMobile = window.innerWidth <= 768;
         backwardPlayer.traverse((node) => {
             if (node.isMesh) {
-                node.castShadow = true;
-                node.receiveShadow = true;
+                node.castShadow = !isMobile;
+                node.receiveShadow = !isMobile;
 
                 if (node.material) {
                     if (node.material.map) {
@@ -467,7 +488,7 @@ function createGroundSegment(zPos, skipObstacles = false) {
     });
     const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
     groundMesh.position.set(0, -0.25, 0);
-    groundMesh.receiveShadow = true;
+    groundMesh.receiveShadow = window.innerWidth > 768; // Only receive shadows on desktop
     group.add(groundMesh);
 
     // Red obstacles removed - only blockchain blocks spawn now
@@ -1285,8 +1306,11 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
     const blockObstacle = new THREE.Mesh(blockGeometry, blockMaterial);
 
     blockObstacle.position.set(lanes[laneidx], blockHeight / 2, blockZ);
-    blockObstacle.castShadow = true;
-    blockObstacle.receiveShadow = true;
+
+    // Only enable shadows on desktop for performance
+    const isMobile = window.innerWidth <= 768;
+    blockObstacle.castShadow = !isMobile;
+    blockObstacle.receiveShadow = !isMobile;
 
     furthestSegment.add(blockObstacle);
 
