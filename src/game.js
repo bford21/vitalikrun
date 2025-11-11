@@ -1398,16 +1398,29 @@ function disconnectBlockchainStream() {
 }
 
 // Wallet and Leaderboard functionality
-// Wallet state comes from React/RainbowKit
+// Wallet state comes from React/RainbowKit or Farcaster
 let connectedWallet = null;
 let provider = null;
+let farcasterFid = null;
+let farcasterUsername = null;
 
-// Listen for wallet changes from React
+// Listen for wallet changes from React or Farcaster auth
 window.addEventListener('walletChange', async (event) => {
-    const { address, isConnected } = event.detail;
+    const { address, isConnected, farcasterFid: fid, farcasterUsername: username } = event.detail;
 
-    if (isConnected && address) {
+    // Farcaster authentication
+    if (fid) {
+        farcasterFid = fid;
+        farcasterUsername = username;
+        connectedWallet = null; // Don't use wallet in Farcaster mode
+        provider = null;
+        console.log('🟣 Farcaster user authenticated:', farcasterUsername, 'FID:', farcasterFid);
+    }
+    // Regular wallet authentication
+    else if (isConnected && address) {
         connectedWallet = address;
+        farcasterFid = null;
+        farcasterUsername = null;
         // Get provider from window.ethereum for signing
         if (window.ethereum) {
             provider = new ethers.BrowserProvider(window.ethereum);
@@ -1416,6 +1429,8 @@ window.addEventListener('walletChange', async (event) => {
     } else {
         connectedWallet = null;
         provider = null;
+        farcasterFid = null;
+        farcasterUsername = null;
         console.log('Wallet disconnected');
     }
 
@@ -1427,7 +1442,8 @@ window.addEventListener('walletChange', async (event) => {
 
 // Submit score to backend
 async function submitScore() {
-    if (!connectedWallet) {
+    // Check if user is authenticated (either wallet or Farcaster)
+    if (!connectedWallet && !farcasterFid) {
         alert('Please connect your wallet first!');
         return;
     }
@@ -1438,30 +1454,51 @@ async function submitScore() {
     try {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
-        statusDiv.textContent = 'Please sign the message in your wallet...';
-        statusDiv.style.color = '#ffff00';
 
-        // Create message to sign
-        const message = `I scored ${score} points in Vitalik Run!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
+        let requestBody;
 
-        // Sign message
-        const signer = await provider.getSigner();
-        const signature = await signer.signMessage(message);
+        // Farcaster authentication (no signature needed)
+        if (farcasterFid) {
+            statusDiv.textContent = 'Submitting score to leaderboard...';
+            statusDiv.style.color = '#ffff00';
 
-        statusDiv.textContent = 'Submitting score to leaderboard...';
+            requestBody = {
+                farcasterFid,
+                farcasterUsername,
+                score,
+                ethCollected,
+                blocksPassed: obstaclesPassed
+            };
+        }
+        // Wallet authentication (needs signature)
+        else if (connectedWallet) {
+            statusDiv.textContent = 'Please sign the message in your wallet...';
+            statusDiv.style.color = '#ffff00';
 
-        // Submit to backend
-        const response = await fetch(`${API_URL}/submit-score`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+            // Create message to sign
+            const message = `I scored ${score} points in Vitalik Run!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
+
+            // Sign message
+            const signer = await provider.getSigner();
+            const signature = await signer.signMessage(message);
+
+            statusDiv.textContent = 'Submitting score to leaderboard...';
+
+            requestBody = {
                 walletAddress: connectedWallet,
                 score,
                 ethCollected,
                 blocksPassed: obstaclesPassed,
                 signature,
                 message
-            })
+            };
+        }
+
+        // Submit to backend
+        const response = await fetch(`${API_URL}/submit-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
         });
 
         const result = await response.json();
@@ -1627,15 +1664,17 @@ function updateGameOverUI() {
     const connectWalletBtn = document.getElementById('connectWalletGameOverBtn');
     const statusDiv = document.getElementById('submissionStatus');
 
-    if (connectedWallet) {
+    // Show submit button if authenticated (wallet or Farcaster)
+    if (connectedWallet || farcasterFid) {
         submitBtn.style.display = 'inline-block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit Score';
         connectWalletBtn.style.display = 'none';
         statusDiv.textContent = '';
     } else {
+        // Only show connect wallet button if not in Farcaster (should never happen in Farcaster)
         submitBtn.style.display = 'none';
-        connectWalletBtn.style.display = 'inline-block';
+        connectWalletBtn.style.display = window.isFarcasterApp ? 'none' : 'inline-block';
         statusDiv.textContent = '';
     }
 }
@@ -1661,6 +1700,20 @@ backgroundMusic.play().catch(e => {
 // Connect to blockchain stream on page load
 connectBlockchainStream();
 
+// Notify Farcaster that app is ready (if running as mini app)
+if (window.isFarcasterApp) {
+    import('@farcaster/miniapp-sdk').then(({ sdk }) => {
+        // Wait a bit for everything to load, then call ready()
+        setTimeout(() => {
+            sdk.actions.ready().then(() => {
+                console.log('🟣 Farcaster mini app ready');
+            }).catch(err => {
+                console.error('Failed to notify Farcaster ready:', err);
+            });
+        }, 500);
+    });
+}
+
 // Handle page visibility changes to disconnect when tab is hidden
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
@@ -1675,4 +1728,21 @@ document.addEventListener('visibilitychange', () => {
 // Disconnect stream when page is about to be closed
 window.addEventListener('beforeunload', () => {
     disconnectBlockchainStream();
+});
+
+// Credits modal handlers
+document.getElementById('creditsBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('creditsModal').style.display = 'block';
+});
+
+document.getElementById('closeCredits').addEventListener('click', () => {
+    document.getElementById('creditsModal').style.display = 'none';
+});
+
+// Close credits modal when clicking outside
+document.getElementById('creditsModal').addEventListener('click', (e) => {
+    if (e.target.id === 'creditsModal') {
+        document.getElementById('creditsModal').style.display = 'none';
+    }
 });

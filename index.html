@@ -3,7 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Run Vitalik</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>">
+    <title>Vitalik Run - Web3 Endless Runner</title>
+
+    <!-- Farcaster Mini App Metadata -->
+    <meta name="fc:frame" content="vNext">
+    <meta name="fc:frame:image" content="https://vitalikrun.com/og-image.png">
+    <meta name="fc:frame:button:1" content="Play Game">
+    <meta name="fc:frame:button:1:action" content="launch_frame">
+    <meta name="fc:frame:button:1:target" content="https://vitalikrun.com">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Vitalik Run">
+    <meta property="og:description" content="Web3 endless runner game with real-time blockchain block spawning">
+    <meta property="og:image" content="https://vitalikrun.com/og-image.png">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Vitalik Run">
+    <meta name="twitter:description" content="Web3 endless runner game with real-time blockchain block spawning">
+    <meta name="twitter:image" content="https://vitalikrun.com/og-image.png">
     <style>
         * {
             margin: 0;
@@ -490,6 +510,11 @@
                 <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
             </svg>
         </a>
+        <a href="#" id="creditsBtn" title="Credits" style="cursor: pointer;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+        </a>
     </div>
 
     <div id="mobileControls">
@@ -506,6 +531,26 @@
             </div>
             <div id="leaderboardEntries" style="color: white;">
                 <div style="text-align: center; color: #00ffff; padding: 40px;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="creditsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 200; overflow-y: auto;">
+        <div style="max-width: 600px; margin: 50px auto; background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%); padding: 40px; border-radius: 20px; border: 3px solid #627EEA;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 style="color: #00ffff; font-size: 32px; margin: 0;">ℹ️ Credits</h2>
+                <button id="closeCredits" style="background: #ff0000; color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 16px; font-weight: bold;">✕ Close</button>
+            </div>
+            <div style="color: white; font-size: 16px; line-height: 1.8;">
+                <div>
+                    <h3 style="color: #627EEA; font-size: 20px; margin-bottom: 10px;">3D Models</h3>
+                    <p style="margin: 0;">
+                        Vitalik Buterin character model by
+                        <a href="https://sketchfab.com/vadimfedenko" target="_blank" rel="noopener noreferrer" style="color: #00ffff; text-decoration: none; font-weight: bold;">
+                            Vadim Fedenko
+                        </a>
+                    </p>
+                </div>
             </div>
         </div>
     </div>

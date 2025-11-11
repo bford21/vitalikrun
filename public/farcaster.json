@@ -1,0 +1,11 @@
+{
+  "name": "Vitalik Run",
+  "version": "1.0.0",
+  "description": "Web3 endless runner game featuring Vitalik Buterin with real-time blockchain block spawning from Base, Optimism, Ethereum, and Arbitrum networks",
+  "icon": "/vitalik_buterin_idle.glb",
+  "homeUrl": "https://vitalikrun.com",
+  "imageUrl": "/og-image.png",
+  "splashBackgroundColor": "#0a0a1a",
+  "splashImageUrl": "/splash.png",
+  "permissions": []
+}
