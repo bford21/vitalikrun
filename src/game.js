@@ -9,6 +9,9 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 const coinSound = new Audio('/coin.mp3');
 coinSound.volume = 0.3; // Set volume to 30%
 
+const powerupSound = new Audio('/coin.mp3'); // Reuse coin sound for now, can be replaced
+powerupSound.volume = 0.5;
+
 const backgroundMusic = new Audio('/track.mp3');
 backgroundMusic.volume = 0.2; // Set volume to 20%
 backgroundMusic.loop = true; // Loop the track
@@ -18,10 +21,13 @@ let isMuted = false;
 // Game state
 let scene, camera, renderer;
 let player, playerMixer;
+let backwardPlayer, backwardPlayerMixer; // Backward running model for powerup
 let ground = [];
 let obstacles = [];
 let coins = [];
+let powerups = []; // Track powerup coins
 let blockchainBlocks = []; // Track blockchain-generated blocks separately
+let fallingBlocks = []; // Blocks that are falling through the floor during powerup
 let matrixRain = []; // Falling matrix symbols
 let gameSpeed = 0.2;
 let score = 0;
@@ -30,6 +36,11 @@ let obstaclesPassed = 0;
 let gameOver = false;
 let isJumping = false;
 let jumpVelocity = 0;
+
+// Powerup state
+let powerupActive = false;
+let powerupEndTime = 0;
+let blockSpawnDelay = 0; // Timestamp when blocks can spawn again
 
 // Game over screen 3D model
 let gameOverScene, gameOverCamera, gameOverRenderer;
@@ -305,6 +316,54 @@ function loadPlayer() {
         player.castShadow = true;
         scene.add(player);
     });
+
+    // Also load the backward running model for powerup
+    loadBackwardPlayer();
+}
+
+// Load the backward running model (used during powerup)
+function loadBackwardPlayer() {
+    const loader = new GLTFLoader();
+    loader.load('/vitalik_buterin_running_backward.glb', (gltf) => {
+        backwardPlayer = gltf.scene;
+
+        // Scale and position (same as regular player)
+        backwardPlayer.scale.set(1, 1, 1);
+        backwardPlayer.position.set(lanes[currentLane], PLAYER_Y_OFFSET, 5);
+        backwardPlayer.rotation.y = Math.PI;
+
+        // Enable shadows
+        backwardPlayer.traverse((node) => {
+            if (node.isMesh) {
+                node.castShadow = true;
+                node.receiveShadow = true;
+
+                if (node.material) {
+                    if (node.material.map) {
+                        node.material.map.colorSpace = THREE.SRGBColorSpace;
+                        node.material.map.needsUpdate = true;
+                    }
+                    if (node.material.emissiveMap) {
+                        node.material.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+                        node.material.emissiveMap.needsUpdate = true;
+                    }
+                    node.material.needsUpdate = true;
+                }
+            }
+        });
+
+        // Setup animation mixer
+        if (gltf.animations && gltf.animations.length > 0) {
+            backwardPlayerMixer = new THREE.AnimationMixer(backwardPlayer);
+            const action = backwardPlayerMixer.clipAction(gltf.animations[0]);
+            action.play();
+        }
+
+        // Don't add to scene yet - will be swapped in during powerup
+        console.log('Backward running model loaded');
+    }, undefined, (error) => {
+        console.error('Error loading backward running model:', error);
+    });
 }
 
 // Create an Ethereum logo coin using geometry
@@ -338,6 +397,49 @@ function createEthCoin() {
     bottomPyramid.castShadow = false; // Don't cast shadows
     bottomPyramid.receiveShadow = false;
     coinGroup.add(bottomPyramid);
+
+    return coinGroup;
+}
+
+// Create a glowing powerup ETH coin (larger and more radiant)
+function createPowerupCoin() {
+    const coinGroup = new THREE.Group();
+
+    // Larger, glowing Ethereum diamond with prominent GREEN glow
+    const glowColor = 0x00FF00; // Bright green for powerup
+    const material = new THREE.MeshPhongMaterial({
+        color: glowColor,
+        emissive: glowColor,
+        emissiveIntensity: 1.0, // Maximum glow intensity
+        flatShading: true
+    });
+
+    // Top pyramid (pointing up) - larger size
+    const topGeometry = new THREE.ConeGeometry(0.6, 0.7, 4);
+    const topPyramid = new THREE.Mesh(topGeometry, material);
+    topPyramid.position.y = 0.35;
+    topPyramid.rotation.y = Math.PI / 4;
+    topPyramid.castShadow = false;
+    topPyramid.receiveShadow = false;
+    coinGroup.add(topPyramid);
+
+    // Bottom pyramid (pointing down) - larger size
+    const bottomGeometry = new THREE.ConeGeometry(0.6, 0.7, 4);
+    const bottomPyramid = new THREE.Mesh(bottomGeometry, material);
+    bottomPyramid.position.y = -0.35;
+    bottomPyramid.rotation.y = Math.PI / 4;
+    bottomPyramid.rotation.z = Math.PI;
+    bottomPyramid.castShadow = false;
+    bottomPyramid.receiveShadow = false;
+    coinGroup.add(bottomPyramid);
+
+    // Add a bright green glowing point light around the powerup
+    const glowLight = new THREE.PointLight(glowColor, 3, 8);
+    glowLight.position.set(0, 0, 0);
+    coinGroup.add(glowLight);
+
+    // Mark this as a powerup for identification
+    coinGroup.userData.isPowerup = true;
 
     return coinGroup;
 }
@@ -397,18 +499,32 @@ function createGroundSegment(zPos, skipObstacles = false) {
 
     // Add coins (but not if skipObstacles is true)
     if (!skipObstacles) {
-        const coinCount = Math.floor(Math.random() * 3) + 1;
-        for (let i = 0; i < coinCount; i++) {
-            const coin = createEthCoin();
+        // 10% chance to spawn a powerup instead of regular coins
+        if (Math.random() < 0.1) {
+            const powerup = createPowerupCoin();
             const laneidx = Math.floor(Math.random() * 3);
-            // Spread coins throughout the segment
-            const coinZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
-            coin.position.set(lanes[laneidx], 1.5, coinZ);
-            group.add(coin);
-            coins.push({
-                mesh: coin,
+            const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
+            powerup.position.set(lanes[laneidx], 1.5, powerupZ);
+            group.add(powerup);
+            powerups.push({
+                mesh: powerup,
                 segmentGroup: group
             });
+        } else {
+            // Regular coin spawning
+            const coinCount = Math.floor(Math.random() * 3) + 1;
+            for (let i = 0; i < coinCount; i++) {
+                const coin = createEthCoin();
+                const laneidx = Math.floor(Math.random() * 3);
+                // Spread coins throughout the segment
+                const coinZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
+                coin.position.set(lanes[laneidx], 1.5, coinZ);
+                group.add(coin);
+                coins.push({
+                    mesh: coin,
+                    segmentGroup: group
+                });
+            }
         }
     }
 
@@ -495,23 +611,26 @@ function onWindowResize() {
 function update(deltaTime) {
     if (gameOver || !player) return;
 
+    // Get the currently active player model (forward or backward)
+    const activePlayer = powerupActive && scene.children.includes(backwardPlayer) ? backwardPlayer : player;
+
     // Update score display
     document.getElementById('score').textContent = `Score: ${score}`;
 
     // Increase speed over time
     gameSpeed += 0.0001;
 
-    // Move player towards target lane
+    // Move active player towards target lane
     const targetX = lanes[currentLane];
-    player.position.x += (targetX - player.position.x) * 0.15;
+    activePlayer.position.x += (targetX - activePlayer.position.x) * 0.15;
 
     // Handle jumping
     if (isJumping) {
-        player.position.y += jumpVelocity;
+        activePlayer.position.y += jumpVelocity;
         jumpVelocity -= GRAVITY;
 
-        if (player.position.y <= PLAYER_Y_OFFSET) {
-            player.position.y = PLAYER_Y_OFFSET;
+        if (activePlayer.position.y <= PLAYER_Y_OFFSET) {
+            activePlayer.position.y = PLAYER_Y_OFFSET;
             isJumping = false;
             jumpVelocity = 0;
         }
@@ -599,19 +718,33 @@ function update(deltaTime) {
 
             // Red obstacles removed - only blockchain blocks spawn now
 
-            // Add new coins
-            const coinCount = Math.floor(Math.random() * 3) + 1;
-            for (let i = 0; i < coinCount; i++) {
-                const coin = createEthCoin();
+            // Add new coins or powerups
+            // 10% chance to spawn a powerup instead of regular coins
+            if (Math.random() < 0.1) {
+                const powerup = createPowerupCoin();
                 const laneidx = Math.floor(Math.random() * 3);
-                // Spread coins throughout the segment
-                const coinZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
-                coin.position.set(lanes[laneidx], 1.5, coinZ);
-                segment.add(coin);
-                coins.push({
-                    mesh: coin,
+                const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
+                powerup.position.set(lanes[laneidx], 1.5, powerupZ);
+                segment.add(powerup);
+                powerups.push({
+                    mesh: powerup,
                     segmentGroup: segment
                 });
+            } else {
+                // Regular coin spawning
+                const coinCount = Math.floor(Math.random() * 3) + 1;
+                for (let i = 0; i < coinCount; i++) {
+                    const coin = createEthCoin();
+                    const laneidx = Math.floor(Math.random() * 3);
+                    // Spread coins throughout the segment
+                    const coinZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
+                    coin.position.set(lanes[laneidx], 1.5, coinZ);
+                    segment.add(coin);
+                    coins.push({
+                        mesh: coin,
+                        segmentGroup: segment
+                    });
+                }
             }
         }
     });
@@ -622,6 +755,14 @@ function update(deltaTime) {
         // Gentle bobbing motion
         const baseY = 1.5;
         coinObj.mesh.position.y = baseY + Math.sin(Date.now() * 0.003 + coinObj.mesh.position.x) * 0.1;
+    });
+
+    // Animate powerups - rotate faster and bob more dramatically
+    powerups.forEach(powerupObj => {
+        powerupObj.mesh.rotation.y += 0.1; // Faster rotation
+        // More dramatic bobbing motion
+        const baseY = 1.5;
+        powerupObj.mesh.position.y = baseY + Math.sin(Date.now() * 0.005 + powerupObj.mesh.position.x) * 0.2;
     });
 
     // Animate matrix rain symbols
@@ -636,21 +777,39 @@ function update(deltaTime) {
         }
     });
 
-    // Check collision with obstacles and track passed obstacles
+    // Animate falling blocks (from powerup)
+    for (let i = fallingBlocks.length - 1; i >= 0; i--) {
+        const fallingBlock = fallingBlocks[i];
+
+        // Move block down
+        fallingBlock.mesh.position.y -= fallingBlock.fallSpeed;
+
+        // Add rotation for visual effect
+        fallingBlock.mesh.rotation.x += fallingBlock.rotationSpeed;
+        fallingBlock.mesh.rotation.z += fallingBlock.rotationSpeed * 0.5;
+
+        // Remove block once it's well below the floor
+        if (fallingBlock.mesh.position.y < -10) {
+            scene.remove(fallingBlock.mesh);
+            fallingBlocks.splice(i, 1);
+        }
+    }
+
+    // Check collision with obstacles and track passed obstacles (using activePlayer from update() scope)
     obstacles.forEach(obsObj => {
         const obstacle = obsObj.mesh;
         const worldPos = new THREE.Vector3();
         obstacle.getWorldPosition(worldPos);
 
-        const distance = player.position.distanceTo(worldPos);
+        const distance = activePlayer.position.distanceTo(worldPos);
 
         // Check for collision
-        if (distance < 1.5 && Math.abs(player.position.y - worldPos.y) < 1.5) {
+        if (distance < 1.5 && Math.abs(activePlayer.position.y - worldPos.y) < 1.5) {
             endGame();
         }
 
         // Check if player passed the obstacle (obstacle is now behind player)
-        if (!obsObj.passed && worldPos.z > player.position.z + 2) {
+        if (!obsObj.passed && worldPos.z > activePlayer.position.z + 2) {
             obsObj.passed = true;
             obstaclesPassed++;
             score = (ethCollected * 100) + (obstaclesPassed * 100);
@@ -666,8 +825,8 @@ function update(deltaTime) {
         coin.getWorldPosition(worldPos);
 
         // Calculate distance in X and Z (ignore Y for more forgiving collection)
-        const dx = player.position.x - worldPos.x;
-        const dz = player.position.z - worldPos.z;
+        const dx = activePlayer.position.x - worldPos.x;
+        const dz = activePlayer.position.z - worldPos.z;
         const distance2D = Math.sqrt(dx * dx + dz * dz);
 
         // Collect coin if player is close enough (larger radius for easier collection)
@@ -685,6 +844,121 @@ function update(deltaTime) {
 
             console.log('ETH collected! Total ETH:', ethCollected, 'Score:', score);
         }
+    }
+
+    // Check powerup collection
+    for (let i = powerups.length - 1; i >= 0; i--) {
+        const powerupObj = powerups[i];
+        const powerup = powerupObj.mesh;
+        const worldPos = new THREE.Vector3();
+        powerup.getWorldPosition(worldPos);
+
+        // Calculate distance in X and Z
+        const dx = activePlayer.position.x - worldPos.x;
+        const dz = activePlayer.position.z - worldPos.z;
+        const distance2D = Math.sqrt(dx * dx + dz * dz);
+
+        // Collect powerup if player is close enough
+        if (distance2D < 1.5) {
+            powerupObj.segmentGroup.remove(powerup);
+            powerups.splice(i, 1);
+
+            // Activate powerup!
+            activatePowerup();
+
+            // Play powerup sound
+            if (!isMuted) {
+                powerupSound.currentTime = 0;
+                powerupSound.play().catch(e => console.log('Audio play failed:', e));
+            }
+
+            console.log('💫 POWERUP COLLECTED!');
+        }
+    }
+
+    // Check if powerup has expired
+    if (powerupActive && Date.now() >= powerupEndTime) {
+        deactivatePowerup();
+    }
+}
+
+// Activate powerup: clear blocks, swap models, delay spawning
+function activatePowerup() {
+    console.log('🚀 Activating powerup!');
+    powerupActive = true;
+    powerupEndTime = Date.now() + 5000; // 5 seconds duration
+    blockSpawnDelay = Date.now() + 5000; // Delay block spawning for 5 seconds
+
+    // Make all blockchain blocks fall through the floor
+    blockchainBlocks.forEach(block => {
+        // Detach from segment group so they don't move with ground
+        if (block.segmentGroup) {
+            const worldPos = new THREE.Vector3();
+            block.mesh.getWorldPosition(worldPos);
+            block.segmentGroup.remove(block.mesh);
+            block.mesh.position.copy(worldPos);
+            scene.add(block.mesh);
+            block.segmentGroup = null;
+        }
+
+        // Add to falling blocks array with falling animation data
+        fallingBlocks.push({
+            mesh: block.mesh,
+            fallSpeed: 0.05 + Math.random() * 0.05, // Random fall speed for variety
+            rotationSpeed: (Math.random() - 0.5) * 0.1 // Random rotation for effect
+        });
+    });
+    blockchainBlocks = [];
+    console.log('✨ Blocks falling through floor!');
+
+    // Swap to backward running model
+    if (player && backwardPlayer) {
+        const currentLaneIndex = lanes.indexOf(player.position.x);
+        const currentY = player.position.y;
+        const currentZ = player.position.z;
+
+        // Remove forward player
+        scene.remove(player);
+
+        // Add backward player at same position, rotated 180 degrees
+        backwardPlayer.position.set(lanes[currentLaneIndex >= 0 ? currentLaneIndex : currentLane], currentY, currentZ);
+        backwardPlayer.rotation.y = 0; // Face forward (180 degrees from original Math.PI)
+        scene.add(backwardPlayer);
+
+        // Swap references temporarily
+        const tempMixer = playerMixer;
+        playerMixer = backwardPlayerMixer;
+        backwardPlayerMixer = tempMixer;
+
+        console.log('🔄 Switched to backward running!');
+    }
+}
+
+// Deactivate powerup: swap models back
+function deactivatePowerup() {
+    console.log('⏱️ Powerup ended');
+    powerupActive = false;
+
+    // Swap back to forward running model
+    if (player && backwardPlayer && scene.children.includes(backwardPlayer)) {
+        const currentLaneIndex = lanes.indexOf(backwardPlayer.position.x);
+        const currentY = backwardPlayer.position.y;
+        const currentZ = backwardPlayer.position.z;
+
+        // Remove backward player
+        scene.remove(backwardPlayer);
+
+        // Add forward player back at same position, facing forward (180 degrees)
+        player.position.set(lanes[currentLaneIndex >= 0 ? currentLaneIndex : currentLane], currentY, currentZ);
+        player.rotation.y = Math.PI; // Face forward (original forward direction)
+        scene.add(player);
+
+        // Swap mixers back
+        const tempMixer = playerMixer;
+        playerMixer = backwardPlayerMixer;
+        backwardPlayerMixer = tempMixer;
+
+        console.log('🔙 Switched back to forward running!');
     }
 }
 
@@ -849,6 +1123,12 @@ function addBlockToFeed(blockType, txCount, blockNumber) {
 // Spawn a blockchain block obstacle when a new blockchain block is detected
 function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
     if (!player || gameOver) return;
+
+    // Don't spawn blocks if powerup delay is active
+    if (blockSpawnDelay > 0 && Date.now() < blockSpawnDelay) {
+        console.log('⏸️ Block spawn delayed due to powerup');
+        return;
+    }
 
     // Determine block size based on transaction count
     let blockSize;
