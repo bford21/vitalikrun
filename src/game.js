@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ethers } from 'ethers';
 
-// Dynamic API URL - use relative path in production, localhost in development
-const API_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8080/api'
-  : '/api';
+// Dynamic API URL - use environment variable or fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 // Audio
 const coinSound = new Audio('/coin.mp3');
@@ -960,11 +958,9 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
 
 // Connect to backend SSE stream for blockchain updates
 function setupBlockchainListener() {
-    const sseUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:8080/api/blocks/stream'
-        : '/api/blocks/stream';
+    const sseUrl = `${API_URL}/blocks/stream`;
 
-    console.log('🔗 Connecting to blockchain stream...');
+    console.log('🔗 Connecting to blockchain stream:', sseUrl);
 
     const eventSource = new EventSource(sseUrl);
 
