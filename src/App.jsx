@@ -39,7 +39,10 @@ export default function App() {
             right: '20px',
             zIndex: 1000
           }}>
-            <ConnectButton />
+            <ConnectButton
+              showBalance={false}
+              chainStatus="icon"
+            />
           </div>
           <GameContainer />
         </RainbowKitProvider>

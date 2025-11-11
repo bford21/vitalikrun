@@ -1475,12 +1475,14 @@ async function loadLeaderboard() {
         const data = await response.json();
 
         if (data.leaderboard && data.leaderboard.length > 0) {
+            const isMobile = window.innerWidth <= 768;
+
             let html = `
-                <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 10px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 10px; font-weight: bold;">
+                <div style="display: grid; grid-template-columns: ${isMobile ? '50px 1fr 80px' : '60px 1fr 120px 150px'}; gap: ${isMobile ? '8px' : '10px'}; padding: 10px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: ${isMobile ? '13px' : '16px'};">
                     <div>Rank</div>
                     <div>Wallet</div>
                     <div>Score</div>
-                    <div>Details</div>
+                    ${isMobile ? '' : '<div>Details</div>'}
                 </div>
             `;
 
@@ -1490,14 +1492,24 @@ async function loadLeaderboard() {
                 const address = entry.ens_name || `${entry.wallet_address.slice(0, 6)}...${entry.wallet_address.slice(-4)}`;
                 const isCurrentUser = entry.wallet_address.toLowerCase() === connectedWallet?.toLowerCase();
 
-                html += `
-                    <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center;">
-                        <div style="font-size: 20px;">${rankEmoji} #${entry.rank}</div>
-                        <div style="color: #00ffff;">${address}${isCurrentUser ? ' (You)' : ''}</div>
-                        <div style="font-weight: bold; color: #ffff00;">${entry.score}</div>
-                        <div style="font-size: 12px; color: #aaa;">ETH: ${entry.eth_collected} | Blocks: ${entry.blocks_passed}</div>
-                    </div>
-                `;
+                if (isMobile) {
+                    html += `
+                        <div style="display: grid; grid-template-columns: 50px 1fr 80px; gap: 8px; padding: 12px 8px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center; font-size: 13px;">
+                            <div style="font-size: 18px;">${rankEmoji} #${entry.rank}</div>
+                            <div style="color: #00ffff; font-size: 11px; overflow: hidden; text-overflow: ellipsis;">${address}${isCurrentUser ? ' (You)' : ''}</div>
+                            <div style="font-weight: bold; color: #ffff00; font-size: 15px;">${entry.score}</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center;">
+                            <div style="font-size: 20px;">${rankEmoji} #${entry.rank}</div>
+                            <div style="color: #00ffff;">${address}${isCurrentUser ? ' (You)' : ''}</div>
+                            <div style="font-weight: bold; color: #ffff00;">${entry.score}</div>
+                            <div style="font-size: 12px; color: #aaa;">ETH: ${entry.eth_collected} | Blocks: ${entry.blocks_passed}</div>
+                        </div>
+                    `;
+                }
             });
 
             // If user is connected and not in top 10, fetch and show their rank
@@ -1514,16 +1526,29 @@ async function loadLeaderboard() {
                             const address = userData.ens_name || `${userData.wallet_address.slice(0, 6)}...${userData.wallet_address.slice(-4)}`;
 
                             html += `
-                                <div style="margin: 20px 0 10px; padding: 10px; text-align: center; color: #00ffff; font-style: italic;">
+                                <div style="margin: 20px 0 10px; padding: 10px; text-align: center; color: #00ffff; font-style: italic; font-size: ${isMobile ? '12px' : '14px'};">
                                     ... your rank ...
                                 </div>
-                                <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(0, 255, 0, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00ff00; align-items: center;">
-                                    <div style="font-size: 20px;">#${userData.rank}</div>
-                                    <div style="color: #00ffff;">${address} (You)</div>
-                                    <div style="font-weight: bold; color: #ffff00;">${userData.score}</div>
-                                    <div style="font-size: 12px; color: #aaa;">ETH: ${userData.eth_collected} | Blocks: ${userData.blocks_passed}</div>
-                                </div>
                             `;
+
+                            if (isMobile) {
+                                html += `
+                                    <div style="display: grid; grid-template-columns: 50px 1fr 80px; gap: 8px; padding: 12px 8px; background: rgba(0, 255, 0, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00ff00; align-items: center; font-size: 13px;">
+                                        <div style="font-size: 18px;">#${userData.rank}</div>
+                                        <div style="color: #00ffff; font-size: 11px; overflow: hidden; text-overflow: ellipsis;">${address} (You)</div>
+                                        <div style="font-weight: bold; color: #ffff00; font-size: 15px;">${userData.score}</div>
+                                    </div>
+                                `;
+                            } else {
+                                html += `
+                                    <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(0, 255, 0, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00ff00; align-items: center;">
+                                        <div style="font-size: 20px;">#${userData.rank}</div>
+                                        <div style="color: #00ffff;">${address} (You)</div>
+                                        <div style="font-weight: bold; color: #ffff00;">${userData.score}</div>
+                                        <div style="font-size: 12px; color: #aaa;">ETH: ${userData.eth_collected} | Blocks: ${userData.blocks_passed}</div>
+                                    </div>
+                                `;
+                            }
                         }
                     } catch (userError) {
                         console.log('User not on leaderboard yet');
