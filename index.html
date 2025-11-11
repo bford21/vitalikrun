@@ -134,18 +134,6 @@
             text-align: center;
         }
 
-        #gameOverModel {
-            width: 350px;
-            height: 450px;
-            margin-bottom: 10px;
-            background: transparent;
-            overflow: visible;
-        }
-
-        #gameOverModel canvas {
-            display: block;
-        }
-
         #gameOverText {
             width: 100%;
         }
@@ -303,11 +291,6 @@
                 gap: 20px;
             }
 
-            #gameOverModel {
-                width: 150px;
-                height: 270px;
-            }
-
             #gameOverText {
                 text-align: center;
             }
@@ -357,22 +340,25 @@
 
     <div id="gameOver">
         <div id="gameOverContent">
-            <div id="gameOverModel"></div>
             <h1>Game Over!</h1>
             <div id="gameOverText">
-                <div id="scoreBreakdown" style="margin-bottom: 30px; font-size: 18px; line-height: 1.8;">
-                    <div style="margin-bottom: 10px;">
-                        <span style="color: #627EEA;">ETH Collected:</span> <span id="ethCount">0</span> × 100 = <span id="ethPoints">0</span>
+                <div style="margin-bottom: 40px;">
+                    <div style="font-size: 72px; font-weight: bold; color: #00ffff; text-shadow: 0 0 30px rgba(0, 255, 255, 0.8); margin-bottom: 20px;">
+                        <span id="finalScore">0</span>
                     </div>
-                    <div style="margin-bottom: 10px;">
-                        <span style="color: #FF6B6B;">Blocks Passed:</span> <span id="obstaclesCount">0</span> × 100 = <span id="obstaclesPoints">0</span>
+                    <div style="font-size: 20px; color: rgba(255, 255, 255, 0.6);">TOTAL SCORE</div>
+                </div>
+                <div id="scoreBreakdown" style="margin-bottom: 40px; font-size: 16px; line-height: 1.8; color: rgba(255, 255, 255, 0.7);">
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #627EEA;">💎 ETH Collected:</span> <span id="ethCount">0</span> × 100 = <span id="ethPoints">0</span>
                     </div>
-                    <div style="border-top: 2px solid #627EEA; padding-top: 10px; margin-top: 10px;">
-                        <strong style="font-size: 24px;">Total Score: <span id="finalScore">0</span></strong>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #FF6B6B;">📦 Blocks Passed:</span> <span id="obstaclesCount">0</span> × 100 = <span id="obstaclesPoints">0</span>
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
                     <button id="submitScoreBtn" style="display: none;">Submit Score</button>
+                    <button id="connectWalletGameOverBtn" style="display: none;">Connect Wallet</button>
                     <button onclick="restartGame()">Play Again</button>
                     <button id="leaderboardBtn">🏆 Leaderboard</button>
                 </div>
@@ -382,7 +368,7 @@
     </div>
 
     <div id="instructions">
-        <p>Use ARROW KEYS to move left/right | SPACE to jump</p>
+        <p>Use ARROW KEYS or WASD to move | SPACE to jump</p>
     </div>
 
     <div id="mobileControls">

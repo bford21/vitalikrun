@@ -45,9 +45,9 @@ let blockSpawnDelay = 0; // Timestamp when blocks can spawn again
 let magneticPowerupActive = false; // Magnetic coin attraction powerup
 let magneticPowerupEndTime = 0;
 
-// Game over screen 3D model
-let gameOverScene, gameOverCamera, gameOverRenderer;
-let idleModel, idleMixer;
+// Blockchain stream management
+let eventSource = null;
+let reconnectTimeout = null;
 
 // Player position
 const lanes = [-3, 0, 3];
@@ -128,9 +128,6 @@ function init() {
     // Mobile touch controls
     setupMobileControls();
 
-    // Setup game over screen 3D model
-    setupGameOverModel();
-
     // Create subtle matrix rain
     createMatrixRain();
 
@@ -183,76 +180,6 @@ function createMatrixRain() {
         scene.add(sprite);
         matrixRain.push(sprite);
     }
-}
-
-// Setup the game over screen 3D model display
-function setupGameOverModel() {
-    const container = document.getElementById('gameOverModel');
-
-    // Create separate scene for game over model
-    gameOverScene = new THREE.Scene();
-    // Make scene background transparent so CSS background shows through
-    gameOverScene.background = null;
-
-    // Check if mobile for responsive sizing
-    const isMobile = window.innerWidth <= 768;
-    const modelWidth = isMobile ? 150 : 350;
-    const modelHeight = isMobile ? 270 : 450;
-
-    // Camera for game over model - adjusted to show full character centered and larger
-    gameOverCamera = new THREE.PerspectiveCamera(45, modelWidth / modelHeight, 0.1, 100);
-    gameOverCamera.position.set(0, 0, 4);
-    gameOverCamera.lookAt(0, 0, 0);
-
-    // Renderer for game over model - fully transparent to use CSS background
-    gameOverRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    gameOverRenderer.setSize(modelWidth, modelHeight);
-    gameOverRenderer.outputEncoding = THREE.sRGBEncoding;
-    gameOverRenderer.setClearColor(0x000000, 0); // Transparent background
-    container.appendChild(gameOverRenderer.domElement);
-
-    // Lighting for game over model
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    gameOverScene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(2, 3, 2);
-    gameOverScene.add(directionalLight);
-
-    const fillLight = new THREE.DirectionalLight(0x627EEA, 0.5);
-    fillLight.position.set(-2, 1, -1);
-    gameOverScene.add(fillLight);
-
-    // Load idle model
-    const loader = new GLTFLoader();
-    loader.load('/vitalik_buterin_idle.glb', (gltf) => {
-        idleModel = gltf.scene;
-
-        // Position model to show full head and body - centered and lowered
-        idleModel.position.set(0, -1.5, 0);
-        idleModel.scale.set(0.95, 0.95, 0.95);
-
-        // Setup animation
-        if (gltf.animations && gltf.animations.length > 0) {
-            idleMixer = new THREE.AnimationMixer(idleModel);
-            const action = idleMixer.clipAction(gltf.animations[0]);
-            action.play();
-        }
-
-        gameOverScene.add(idleModel);
-    });
-
-    // Render loop for game over model
-    function renderGameOverModel() {
-        requestAnimationFrame(renderGameOverModel);
-
-        if (idleMixer) {
-            idleMixer.update(0.016);
-        }
-
-        gameOverRenderer.render(gameOverScene, gameOverCamera);
-    }
-    renderGameOverModel();
 }
 
 // Load the player GLB model
@@ -587,18 +514,21 @@ function onKeyDown(event) {
 
     switch(event.code) {
         case 'ArrowLeft':
+        case 'KeyA':
             if (currentLane > 0) {
                 currentLane--;
                 targetLane = currentLane;
             }
             break;
         case 'ArrowRight':
+        case 'KeyD':
             if (currentLane < 2) {
                 currentLane++;
                 targetLane = currentLane;
             }
             break;
         case 'Space':
+        case 'KeyW':
             if (!isJumping && player) {
                 isJumping = true;
                 jumpVelocity = JUMP_POWER;
@@ -1131,6 +1061,9 @@ function animate() {
 function endGame() {
     gameOver = true;
 
+    // Disconnect from blockchain stream to save credits
+    disconnectBlockchainStream();
+
     // Pause background music
     backgroundMusic.pause();
 
@@ -1213,6 +1146,9 @@ window.restartGame = function() {
     if (!isMuted) {
         backgroundMusic.play().catch(e => console.log('Music play failed:', e));
     }
+
+    // Reconnect to blockchain stream
+    connectBlockchainStream();
 
     document.getElementById('gameOver').style.display = 'none';
     document.getElementById('score').textContent = 'Score: 0';
@@ -1368,12 +1304,17 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
 }
 
 // Connect to backend SSE stream for blockchain updates
-function setupBlockchainListener() {
-    const sseUrl = `${API_URL}/blocks/stream`;
+function connectBlockchainStream() {
+    // Don't connect if already connected
+    if (eventSource) {
+        console.log('🔗 Already connected to blockchain stream');
+        return;
+    }
 
+    const sseUrl = `${API_URL}/blocks/stream`;
     console.log('🔗 Connecting to blockchain stream:', sseUrl);
 
-    const eventSource = new EventSource(sseUrl);
+    eventSource = new EventSource(sseUrl);
 
     eventSource.onopen = () => {
         console.log('✅ Connected to blockchain stream');
@@ -1389,7 +1330,7 @@ function setupBlockchainListener() {
                 return;
             }
 
-            // Skip if game is over
+            // Skip if game is over (shouldn't happen, but safety check)
             if (gameOver) return;
 
             const { chain, blockNumber, txCount } = data;
@@ -1408,12 +1349,28 @@ function setupBlockchainListener() {
 
     eventSource.onerror = (error) => {
         console.error('❌ Blockchain stream error:', error);
-        eventSource.close();
+        disconnectBlockchainStream();
 
-        // Reconnect after 5 seconds
-        console.log('🔄 Reconnecting in 5 seconds...');
-        setTimeout(setupBlockchainListener, 5000);
+        // Only reconnect if game is still active
+        if (!gameOver) {
+            console.log('🔄 Reconnecting in 5 seconds...');
+            reconnectTimeout = setTimeout(connectBlockchainStream, 5000);
+        }
     };
+}
+
+// Disconnect from blockchain stream
+function disconnectBlockchainStream() {
+    if (eventSource) {
+        console.log('🔌 Disconnecting from blockchain stream');
+        eventSource.close();
+        eventSource = null;
+    }
+
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+    }
 }
 
 // Wallet and Leaderboard functionality
@@ -1606,21 +1563,30 @@ function toggleMute() {
 // Event listeners (wallet button is now handled by RainbowKit React component)
 document.getElementById('muteBtn').addEventListener('click', toggleMute);
 document.getElementById('submitScoreBtn').addEventListener('click', submitScore);
+document.getElementById('connectWalletGameOverBtn').addEventListener('click', () => {
+    // Open RainbowKit modal via exposed function
+    if (window.openWalletModal) {
+        window.openWalletModal();
+    }
+});
 document.getElementById('leaderboardBtn').addEventListener('click', loadLeaderboard);
 document.getElementById('closeLeaderboard').addEventListener('click', closeLeaderboard);
 
 // Show submit button when game ends if wallet is connected
 function updateGameOverUI() {
     const submitBtn = document.getElementById('submitScoreBtn');
+    const connectWalletBtn = document.getElementById('connectWalletGameOverBtn');
     const statusDiv = document.getElementById('submissionStatus');
 
     if (connectedWallet) {
         submitBtn.style.display = 'inline-block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit Score';
+        connectWalletBtn.style.display = 'none';
         statusDiv.textContent = '';
     } else {
         submitBtn.style.display = 'none';
+        connectWalletBtn.style.display = 'inline-block';
         statusDiv.textContent = '';
     }
 }
@@ -1643,5 +1609,21 @@ backgroundMusic.play().catch(e => {
     document.addEventListener('keydown', startMusic);
 });
 
-// Setup blockchain listener (connects to backend SSE stream)
-setupBlockchainListener();
+// Connect to blockchain stream on page load
+connectBlockchainStream();
+
+// Handle page visibility changes to disconnect when tab is hidden
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        console.log('⏸️ Page hidden - disconnecting blockchain stream');
+        disconnectBlockchainStream();
+    } else if (!gameOver) {
+        console.log('▶️ Page visible - reconnecting blockchain stream');
+        connectBlockchainStream();
+    }
+});
+
+// Disconnect stream when page is about to be closed
+window.addEventListener('beforeunload', () => {
+    disconnectBlockchainStream();
+});
