@@ -2,17 +2,31 @@
   "name": "vitalikrun",
   "version": "1.0.0",
   "description": "Web3 endless runner game featuring Vitalik Buterin with real-time blockchain integration",
-  "main": "backend/src/server.js",
   "type": "module",
   "scripts": {
-    "start": "cd backend && npm install && npm start",
-    "dev": "cd backend && npm run dev",
-    "install-backend": "cd backend && npm install"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "backend": "cd backend && npm start"
   },
   "keywords": ["web3", "game", "blockchain", "ethereum", "base", "optimism", "arbitrum"],
   "author": "",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.0",
+    "@tanstack/react-query": "^5.62.11",
+    "ethers": "^6.9.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.139.0",
+    "viem": "^2.21.55",
+    "wagmi": "^2.13.6"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
   }
 }

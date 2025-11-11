@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Temple Run Style Game</title>
+    <title>Run Vitalik</title>
     <style>
         * {
             margin: 0;
@@ -38,9 +38,24 @@
             margin-bottom: 10px;
         }
 
+        #muteBtn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 5px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            transition: transform 0.2s;
+        }
+
+        #muteBtn:hover {
+            transform: scale(1.2);
+        }
+
         #blockFeed {
             position: absolute;
-            top: 20px;
+            top: 80px;
             right: 20px;
             color: white;
             font-size: 14px;
@@ -102,7 +117,7 @@
             background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
             backdrop-filter: blur(10px);
             color: white;
-            padding: 60px;
+            padding: 30px;
             border-radius: 30px;
             border: 3px solid #627EEA;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
@@ -114,17 +129,17 @@
 
         #gameOverContent {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 40px;
+            text-align: center;
         }
 
         #gameOverModel {
-            width: 250px;
+            width: 350px;
             height: 450px;
-            flex-shrink: 0;
-            background: #1a1a2e;
-            border-radius: 10px;
-            overflow: hidden;
+            margin-bottom: 10px;
+            background: transparent;
+            overflow: visible;
         }
 
         #gameOverModel canvas {
@@ -132,8 +147,7 @@
         }
 
         #gameOverText {
-            flex: 1;
-            text-align: left;
+            width: 100%;
         }
 
         #gameOver h1 {
@@ -160,12 +174,38 @@
             transition: all 0.3s;
             font-weight: bold;
             box-shadow: 0 5px 15px rgba(98, 126, 234, 0.4);
+            min-width: 200px;
         }
 
         #gameOver button:hover {
-            background: #4a5fc1;
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(98, 126, 234, 0.6);
+        }
+
+        #submitScoreBtn {
+            background: #00D9FF !important;
+            color: #000 !important;
+        }
+
+        #submitScoreBtn:hover {
+            background: #00B8D4 !important;
+        }
+
+        button[onclick="restartGame()"] {
+            background: #00FF88 !important;
+            color: #000 !important;
+        }
+
+        button[onclick="restartGame()"]:hover {
+            background: #00DD77 !important;
+        }
+
+        #leaderboardBtn {
+            background: #FF6B9D !important;
+        }
+
+        #leaderboardBtn:hover {
+            background: #E5547F !important;
         }
 
         #instructions {
@@ -304,10 +344,10 @@
     </style>
 </head>
 <body>
+    <div id="react-root"></div>
     <div id="ui">
         <div id="score">Score: 0</div>
-        <button id="walletBtn" style="margin-top: 10px; padding: 10px 20px; background: #627EEA; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold;">Connect Wallet</button>
-        <div id="walletAddress" style="display: none; margin-top: 10px; font-size: 14px; color: #00ffff;"></div>
+        <button id="muteBtn" title="Mute/Unmute">🔊</button>
     </div>
 
     <div id="blockFeed">
@@ -318,8 +358,8 @@
     <div id="gameOver">
         <div id="gameOverContent">
             <div id="gameOverModel"></div>
+            <h1>Game Over!</h1>
             <div id="gameOverText">
-                <h1>Game Over!</h1>
                 <div id="scoreBreakdown" style="margin-bottom: 30px; font-size: 18px; line-height: 1.8;">
                     <div style="margin-bottom: 10px;">
                         <span style="color: #627EEA;">ETH Collected:</span> <span id="ethCount">0</span> × 100 = <span id="ethPoints">0</span>
@@ -331,12 +371,12 @@
                         <strong style="font-size: 24px;">Total Score: <span id="finalScore">0</span></strong>
                     </div>
                 </div>
-                <div id="submitScoreSection" style="display: none; margin-bottom: 20px;">
-                    <button id="submitScoreBtn" style="font-size: 20px; padding: 15px 40px; background: #00ff00; color: #000; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 10px;">Submit Score</button>
-                    <div id="submissionStatus" style="font-size: 14px; margin-top: 10px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+                    <button id="submitScoreBtn" style="display: none;">Submit Score</button>
+                    <button onclick="restartGame()">Play Again</button>
+                    <button id="leaderboardBtn">🏆 Leaderboard</button>
                 </div>
-                <button onclick="restartGame()">Play Again</button>
-                <button id="leaderboardBtn" style="font-size: 20px; padding: 15px 40px; background: #ff00ff; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-left: 10px;">Leaderboard</button>
+                <div id="submissionStatus" style="font-size: 14px; margin-top: 10px;"></div>
             </div>
         </div>
     </div>
@@ -363,15 +403,6 @@
         </div>
     </div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.139.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.139.0/examples/jsm/",
-                "ethers": "https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"
-            }
-        }
-    </script>
-    <script type="module" src="game.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
