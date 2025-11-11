@@ -36,11 +36,14 @@ let obstaclesPassed = 0;
 let gameOver = false;
 let isJumping = false;
 let jumpVelocity = 0;
+let segmentCounter = 0; // Track segments for safe landing zones
 
 // Powerup state
 let powerupActive = false;
 let powerupEndTime = 0;
 let blockSpawnDelay = 0; // Timestamp when blocks can spawn again
+let magneticPowerupActive = false; // Magnetic coin attraction powerup
+let magneticPowerupEndTime = 0;
 
 // Game over screen 3D model
 let gameOverScene, gameOverCamera, gameOverRenderer;
@@ -440,6 +443,51 @@ function createPowerupCoin() {
 
     // Mark this as a powerup for identification
     coinGroup.userData.isPowerup = true;
+    coinGroup.userData.powerupType = 'clear'; // Green = clear blocks powerup
+
+    return coinGroup;
+}
+
+// Create a magnetic powerup ETH coin (yellow, attracts coins)
+function createMagneticPowerupCoin() {
+    const coinGroup = new THREE.Group();
+
+    // Larger, glowing Ethereum diamond with YELLOW glow for magnetic powerup
+    const glowColor = 0xFFFF00; // Bright yellow for magnetic powerup
+    const material = new THREE.MeshPhongMaterial({
+        color: glowColor,
+        emissive: glowColor,
+        emissiveIntensity: 1.0, // Maximum glow intensity
+        flatShading: true
+    });
+
+    // Top pyramid (pointing up) - larger size
+    const topGeometry = new THREE.ConeGeometry(0.6, 0.7, 4);
+    const topPyramid = new THREE.Mesh(topGeometry, material);
+    topPyramid.position.y = 0.35;
+    topPyramid.rotation.y = Math.PI / 4;
+    topPyramid.castShadow = false;
+    topPyramid.receiveShadow = false;
+    coinGroup.add(topPyramid);
+
+    // Bottom pyramid (pointing down) - larger size
+    const bottomGeometry = new THREE.ConeGeometry(0.6, 0.7, 4);
+    const bottomPyramid = new THREE.Mesh(bottomGeometry, material);
+    bottomPyramid.position.y = -0.35;
+    bottomPyramid.rotation.y = Math.PI / 4;
+    bottomPyramid.rotation.z = Math.PI;
+    bottomPyramid.castShadow = false;
+    bottomPyramid.receiveShadow = false;
+    coinGroup.add(bottomPyramid);
+
+    // Add a bright yellow glowing point light around the powerup
+    const glowLight = new THREE.PointLight(glowColor, 3, 8);
+    glowLight.position.set(0, 0, 0);
+    coinGroup.add(glowLight);
+
+    // Mark this as a magnetic powerup for identification
+    coinGroup.userData.isPowerup = true;
+    coinGroup.userData.powerupType = 'magnetic'; // Yellow = magnetic powerup
 
     return coinGroup;
 }
@@ -499,9 +547,10 @@ function createGroundSegment(zPos, skipObstacles = false) {
 
     // Add coins (but not if skipObstacles is true)
     if (!skipObstacles) {
-        // 10% chance to spawn a powerup instead of regular coins
-        if (Math.random() < 0.1) {
-            const powerup = createPowerupCoin();
+        // 2.5% chance to spawn a powerup instead of regular coins
+        if (Math.random() < 0.025) {
+            // 50/50 chance between green (clear blocks) and yellow (magnetic) powerup
+            const powerup = Math.random() < 0.5 ? createPowerupCoin() : createMagneticPowerupCoin();
             const laneidx = Math.floor(Math.random() * 3);
             const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
             powerup.position.set(lanes[laneidx], 1.5, powerupZ);
@@ -674,6 +723,9 @@ function update(deltaTime) {
 
             segment.position.z = minZ - GROUND_LENGTH;
 
+            // Increment segment counter for safe landing zones
+            segmentCounter++;
+
             // Remove old obstacles and coins associated with this segment (but keep blockchain blocks)
             obstacles = obstacles.filter(obs => {
                 if (obs.segmentGroup === segment && !obs.isBlockchainBlock) {
@@ -718,25 +770,19 @@ function update(deltaTime) {
 
             // Red obstacles removed - only blockchain blocks spawn now
 
-            // Add new coins or powerups
-            // 10% chance to spawn a powerup instead of regular coins
-            if (Math.random() < 0.1) {
-                const powerup = createPowerupCoin();
-                const laneidx = Math.floor(Math.random() * 3);
-                const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
-                powerup.position.set(lanes[laneidx], 1.5, powerupZ);
-                segment.add(powerup);
-                powerups.push({
-                    mesh: powerup,
-                    segmentGroup: segment
-                });
-            } else {
-                // Regular coin spawning
-                const coinCount = Math.floor(Math.random() * 3) + 1;
+            // Determine if this should be a safe landing zone
+            // Every 4th segment at high speeds becomes a safe zone (no obstacles)
+            // This is most important when game speed > 0.35
+            const isSafeLandingZone = gameSpeed > 0.35 && segmentCounter % 4 === 0;
+
+            // Add new coins or powerups (skip on safe landing zones at high speeds)
+            if (isSafeLandingZone) {
+                console.log('🛬 Safe landing zone created (no obstacles)');
+                // Still spawn coins on safe zones, just no obstacles
+                const coinCount = Math.floor(Math.random() * 2) + 1;
                 for (let i = 0; i < coinCount; i++) {
                     const coin = createEthCoin();
                     const laneidx = Math.floor(Math.random() * 3);
-                    // Spread coins throughout the segment
                     const coinZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
                     coin.position.set(lanes[laneidx], 1.5, coinZ);
                     segment.add(coin);
@@ -744,6 +790,35 @@ function update(deltaTime) {
                         mesh: coin,
                         segmentGroup: segment
                     });
+                }
+            } else {
+                // 2.5% chance to spawn a powerup instead of regular coins
+                if (Math.random() < 0.025) {
+                    // 50/50 chance between green (clear blocks) and yellow (magnetic) powerup
+                    const powerup = Math.random() < 0.5 ? createPowerupCoin() : createMagneticPowerupCoin();
+                    const laneidx = Math.floor(Math.random() * 3);
+                    const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
+                    powerup.position.set(lanes[laneidx], 1.5, powerupZ);
+                    segment.add(powerup);
+                    powerups.push({
+                        mesh: powerup,
+                        segmentGroup: segment
+                    });
+                } else {
+                    // Regular coin spawning
+                    const coinCount = Math.floor(Math.random() * 3) + 1;
+                    for (let i = 0; i < coinCount; i++) {
+                        const coin = createEthCoin();
+                        const laneidx = Math.floor(Math.random() * 3);
+                        // Spread coins throughout the segment
+                        const coinZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
+                        coin.position.set(lanes[laneidx], 1.5, coinZ);
+                        segment.add(coin);
+                        coins.push({
+                            mesh: coin,
+                            segmentGroup: segment
+                        });
+                    }
                 }
             }
         }
@@ -863,30 +938,60 @@ function update(deltaTime) {
             powerupObj.segmentGroup.remove(powerup);
             powerups.splice(i, 1);
 
-            // Activate powerup!
-            activatePowerup();
+            // Activate appropriate powerup based on type
+            if (powerup.userData.powerupType === 'magnetic') {
+                activateMagneticPowerup();
+            } else {
+                activatePowerup(); // Green powerup
+            }
 
             // Play powerup sound
             if (!isMuted) {
                 powerupSound.currentTime = 0;
                 powerupSound.play().catch(e => console.log('Audio play failed:', e));
             }
-
-            console.log('💫 POWERUP COLLECTED!');
         }
     }
 
-    // Check if powerup has expired
+    // Magnetic powerup - attract nearby coins
+    if (magneticPowerupActive && activePlayer) {
+        const magnetRadius = 8; // Attraction range
+        const magnetStrength = 0.15; // Pull strength
+
+        coins.forEach(coinObj => {
+            const coin = coinObj.mesh;
+            const worldPos = new THREE.Vector3();
+            coin.getWorldPosition(worldPos);
+
+            const dx = activePlayer.position.x - worldPos.x;
+            const dz = activePlayer.position.z - worldPos.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+
+            if (distance < magnetRadius && distance > 0.5) {
+                // Pull coin toward player
+                coin.position.x += (dx / distance) * magnetStrength;
+                coin.position.z += (dz / distance) * magnetStrength;
+            }
+        });
+    }
+
+    // Check if powerups have expired
     if (powerupActive && Date.now() >= powerupEndTime) {
         deactivatePowerup();
+    }
+    if (magneticPowerupActive && Date.now() >= magneticPowerupEndTime) {
+        deactivateMagneticPowerup();
     }
 }
 
 // Activate powerup: clear blocks, swap models, delay spawning
 function activatePowerup() {
     console.log('🚀 Activating powerup!');
+
+    // If powerup is already active, just extend the duration
+    const wasAlreadyActive = powerupActive;
     powerupActive = true;
-    powerupEndTime = Date.now() + 5000; // 5 seconds duration
+    powerupEndTime = Date.now() + 5000; // 5 seconds duration (or extend it)
     blockSpawnDelay = Date.now() + 5000; // Delay block spawning for 5 seconds
 
     // Make all blockchain blocks fall through the floor
@@ -911,8 +1016,8 @@ function activatePowerup() {
     blockchainBlocks = [];
     console.log('✨ Blocks falling through floor!');
 
-    // Swap to backward running model
-    if (player && backwardPlayer) {
+    // Only swap models if we weren't already in powerup mode
+    if (!wasAlreadyActive && player && backwardPlayer && scene.children.includes(player)) {
         const currentLaneIndex = lanes.indexOf(player.position.x);
         const currentY = player.position.y;
         const currentZ = player.position.z;
@@ -931,6 +1036,8 @@ function activatePowerup() {
         backwardPlayerMixer = tempMixer;
 
         console.log('🔄 Switched to backward running!');
+    } else if (wasAlreadyActive) {
+        console.log('⏱️ Extended powerup duration!');
     }
 }
 
@@ -960,6 +1067,19 @@ function deactivatePowerup() {
 
         console.log('🔙 Switched back to forward running!');
     }
+}
+
+// Activate magnetic powerup: attract coins
+function activateMagneticPowerup() {
+    console.log('🧲 Activating magnetic powerup!');
+    magneticPowerupActive = true;
+    magneticPowerupEndTime = Date.now() + 14000; // 14 seconds duration (twice as long)
+}
+
+// Deactivate magnetic powerup
+function deactivateMagneticPowerup() {
+    console.log('🧲 Magnetic powerup ended');
+    magneticPowerupActive = false;
 }
 
 // Animation loop
@@ -1087,6 +1207,7 @@ window.restartGame = function() {
     gameOver = false;
     isJumping = false;
     jumpVelocity = 0;
+    segmentCounter = 0; // Reset segment counter for safe zones
 
     // Resume background music
     if (!isMuted) {
@@ -1127,6 +1248,16 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
     // Don't spawn blocks if powerup delay is active
     if (blockSpawnDelay > 0 && Date.now() < blockSpawnDelay) {
         console.log('⏸️ Block spawn delayed due to powerup');
+        return;
+    }
+
+    // Dynamic spawn probability based on game speed
+    // As speed increases, spawn fewer blocks to allow landing space
+    // At speed 0.2 (start): 100% spawn rate
+    // At speed 0.5+: 40% spawn rate
+    const speedFactor = Math.max(0.4, 1 - (gameSpeed - 0.2) * 1.5);
+    if (Math.random() > speedFactor) {
+        console.log(`⏭️ Block spawn skipped (speed: ${gameSpeed.toFixed(2)}, spawn chance: ${(speedFactor * 100).toFixed(0)}%)`);
         return;
     }
 
