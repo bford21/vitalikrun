@@ -1701,18 +1701,18 @@ backgroundMusic.play().catch(e => {
 connectBlockchainStream();
 
 // Notify Farcaster that app is ready (if running as mini app)
-if (window.isFarcasterApp) {
-    import('@farcaster/miniapp-sdk').then(({ sdk }) => {
-        // Wait a bit for everything to load, then call ready()
-        setTimeout(() => {
-            sdk.actions.ready().then(() => {
-                console.log('🟣 Farcaster mini app ready');
-            }).catch(err => {
-                console.error('Failed to notify Farcaster ready:', err);
-            });
-        }, 500);
+// Call this unconditionally - it will only work if actually in Farcaster
+import('@farcaster/miniapp-sdk').then(({ sdk }) => {
+    sdk.actions.ready().then(() => {
+        console.log('🟣 Farcaster mini app ready');
+    }).catch(err => {
+        // This will fail silently if not in Farcaster, which is expected
+        console.log('Not running in Farcaster mini app context');
     });
-}
+}).catch(() => {
+    // SDK not available, not in Farcaster
+    console.log('Farcaster SDK not available');
+});
 
 // Handle page visibility changes to disconnect when tab is hidden
 document.addEventListener('visibilitychange', () => {
