@@ -32,7 +32,19 @@ export default function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
+        <RainbowKitProvider
+          modalSize="compact"
+          initialChain={config.chains[0]}
+          appInfo={{
+            appName: 'Vitalik Run',
+            learnMoreUrl: 'https://github.com/bford21/vitalikrun',
+            disclaimer: () => (
+              <div style={{ padding: '10px', fontSize: '12px', color: '#888', textAlign: 'center' }}>
+                On mobile? Open this page in your wallet's browser (MetaMask, Coinbase Wallet, Rainbow, etc.) or use WalletConnect.
+              </div>
+            ),
+          }}
+        >
           <div id="wallet-container" style={{
             position: 'absolute',
             top: '20px',
@@ -42,6 +54,10 @@ export default function App() {
             <ConnectButton
               showBalance={false}
               chainStatus="icon"
+              accountStatus={{
+                smallScreen: 'avatar',
+                largeScreen: 'full',
+              }}
             />
           </div>
           <GameContainer />
