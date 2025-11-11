@@ -1639,15 +1639,13 @@ function updateGameOverUI() {
     const connectWalletBtn = document.getElementById('connectWalletGameOverBtn');
     const statusDiv = document.getElementById('submissionStatus');
 
-    // Show submit button if authenticated (wallet or Farcaster)
-    if (connectedWallet || farcasterFid) {
+    if (connectedWallet) {
         submitBtn.style.display = 'inline-block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit Score';
         connectWalletBtn.style.display = 'none';
         statusDiv.textContent = '';
     } else {
-        // Only show connect wallet button if not in Farcaster (should never happen in Farcaster)
         submitBtn.style.display = 'none';
         connectWalletBtn.style.display = window.isFarcasterApp ? 'none' : 'inline-block';
         statusDiv.textContent = '';
