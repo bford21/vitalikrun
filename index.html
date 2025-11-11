@@ -306,6 +306,8 @@
 <body>
     <div id="ui">
         <div id="score">Score: 0</div>
+        <button id="walletBtn" style="margin-top: 10px; padding: 10px 20px; background: #627EEA; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold;">Connect Wallet</button>
+        <div id="walletAddress" style="display: none; margin-top: 10px; font-size: 14px; color: #00ffff;"></div>
     </div>
 
     <div id="blockFeed">
@@ -329,7 +331,12 @@
                         <strong style="font-size: 24px;">Total Score: <span id="finalScore">0</span></strong>
                     </div>
                 </div>
+                <div id="submitScoreSection" style="display: none; margin-bottom: 20px;">
+                    <button id="submitScoreBtn" style="font-size: 20px; padding: 15px 40px; background: #00ff00; color: #000; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-bottom: 10px;">Submit Score</button>
+                    <div id="submissionStatus" style="font-size: 14px; margin-top: 10px;"></div>
+                </div>
                 <button onclick="restartGame()">Play Again</button>
+                <button id="leaderboardBtn" style="font-size: 20px; padding: 15px 40px; background: #ff00ff; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-left: 10px;">Leaderboard</button>
             </div>
         </div>
     </div>
@@ -344,11 +351,24 @@
         <div id="rightBtn" class="mobile-btn">►</div>
     </div>
 
+    <div id="leaderboardModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 200; overflow-y: auto;">
+        <div style="max-width: 800px; margin: 50px auto; background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%); padding: 40px; border-radius: 20px; border: 3px solid #627EEA;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 style="color: #00ffff; font-size: 32px; margin: 0;">🏆 Leaderboard</h2>
+                <button id="closeLeaderboard" style="background: #ff0000; color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 16px; font-weight: bold;">✕ Close</button>
+            </div>
+            <div id="leaderboardEntries" style="color: white;">
+                <div style="text-align: center; color: #00ffff; padding: 40px;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <script type="importmap">
         {
             "imports": {
                 "three": "https://cdn.jsdelivr.net/npm/three@0.139.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.139.0/examples/jsm/"
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.139.0/examples/jsm/",
+                "ethers": "https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"
             }
         }
     </script>

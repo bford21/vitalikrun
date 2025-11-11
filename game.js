@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { config } from './config.js';
+import { ethers } from 'ethers';
+
+// Dynamic API URL - use relative path in production, localhost in development
+const API_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:8080/api'
+  : '/api';
 
 // Game state
 let scene, camera, renderer;
@@ -693,6 +698,9 @@ function endGame() {
     document.getElementById('obstaclesPoints').textContent = obstaclePoints;
     document.getElementById('finalScore').textContent = score;
 
+    // Update game over UI based on wallet connection
+    updateGameOverUI();
+
     document.getElementById('gameOver').style.display = 'block';
 }
 
@@ -891,319 +899,256 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
     console.log(`${blockType.toUpperCase()} block spawned at lane`, laneidx, 'on furthest segment at z:', minZ);
 }
 
-// WebSocket connection to listen for new blocks on Base
-function setupBlockListener() {
-    const ws = new WebSocket(`wss://base-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
+// Connect to backend SSE stream for blockchain updates
+function setupBlockchainListener() {
+    const sseUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:8080/api/blocks/stream'
+        : '/api/blocks/stream';
 
-    ws.onopen = () => {
-        console.log('Connected to Base mainnet WebSocket');
+    console.log('🔗 Connecting to blockchain stream...');
 
-        // Subscribe to new block headers (full transactions will be fetched separately)
-        const subscribeMessage = JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'eth_subscribe',
-            params: ['newHeads']
-        });
+    const eventSource = new EventSource(sseUrl);
 
-        ws.send(subscribeMessage);
-        console.log('Subscribed to new blocks');
+    eventSource.onopen = () => {
+        console.log('✅ Connected to blockchain stream');
     };
 
-    ws.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
+    eventSource.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
 
-        // Handle subscription confirmation
-        if (data.id === 1 && data.result) {
-            console.log('Base Subscription ID:', data.result);
-        }
+            // Skip connection status messages
+            if (data.status === 'connected') {
+                console.log('📡 Stream connection confirmed');
+                return;
+            }
 
-        // Handle new block notifications
-        if (data.method === 'eth_subscription') {
             // Skip if game is over
             if (gameOver) return;
 
-            const blockHeader = data.params.result;
-            const blockNumber = parseInt(blockHeader.number, 16);
+            const { chain, blockNumber, txCount } = data;
 
-            // Fetch full block with transaction count via HTTP
-            try {
-                const response = await fetch(`https://base-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: 1,
-                        method: 'eth_getBlockByNumber',
-                        params: [blockHeader.number, false] // false = only tx hashes, not full tx data
-                    })
-                });
-                const blockData = await response.json();
-                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
+            console.log(`New ${chain.toUpperCase()} block #${blockNumber} - ${txCount} txs`);
 
-                console.log('New Base block received!', {
-                    blockNumber: blockNumber,
-                    blockHash: blockHeader.hash,
-                    txCount: txCount
-                });
+            // Add to feed
+            addBlockToFeed(chain, txCount, blockNumber);
 
-                // Add to feed
-                addBlockToFeed('base', txCount, blockNumber);
-
-                // Spawn a Base block when new block detected
-                spawnBlockObstacle('base', txCount, blockNumber);
-            } catch (error) {
-                console.error('Error fetching Base block data:', error);
-            }
+            // Spawn blockchain block obstacle
+            spawnBlockObstacle(chain, txCount, blockNumber);
+        } catch (error) {
+            console.error('Error processing blockchain update:', error);
         }
     };
 
-    ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-    };
+    eventSource.onerror = (error) => {
+        console.error('❌ Blockchain stream error:', error);
+        eventSource.close();
 
-    ws.onclose = () => {
-        console.log('Base WebSocket connection closed. Reconnecting in 5 seconds...');
-        setTimeout(setupBlockListener, 5000);
+        // Reconnect after 5 seconds
+        console.log('🔄 Reconnecting in 5 seconds...');
+        setTimeout(setupBlockchainListener, 5000);
     };
 }
 
-// WebSocket connection to listen for new blocks on OP Mainnet
-function setupOPBlockListener() {
-    const ws = new WebSocket(`wss://opt-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
+// Wallet and Leaderboard functionality
+let connectedWallet = null;
+let provider = null;
 
-    ws.onopen = () => {
-        console.log('Connected to OP Mainnet WebSocket');
+// Connect wallet with enhanced provider detection
+async function connectWallet() {
+    // Check for injected provider (MetaMask, Coinbase, Rainbow, etc.)
+    if (typeof window.ethereum !== 'undefined') {
+        try {
+            provider = new ethers.BrowserProvider(window.ethereum);
+            const accounts = await provider.send("eth_requestAccounts", []);
+            connectedWallet = accounts[0];
 
-        // Subscribe to new block headers
-        const subscribeMessage = JSON.stringify({
-            jsonrpc: '2.0',
-            id: 2,
-            method: 'eth_subscribe',
-            params: ['newHeads']
-        });
+            // Update UI
+            document.getElementById('walletBtn').textContent = 'Disconnect';
+            document.getElementById('walletAddress').textContent = `Connected: ${connectedWallet.slice(0, 6)}...${connectedWallet.slice(-4)}`;
+            document.getElementById('walletAddress').style.display = 'block';
 
-        ws.send(subscribeMessage);
-        console.log('Subscribed to OP new blocks');
-    };
+            console.log('Wallet connected:', connectedWallet);
 
-    ws.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
+            // Listen for account changes
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else {
+                    connectedWallet = accounts[0];
+                    document.getElementById('walletAddress').textContent = `Connected: ${connectedWallet.slice(0, 6)}...${connectedWallet.slice(-4)}`;
+                    console.log('Account changed:', connectedWallet);
+                }
+            });
 
-        // Handle subscription confirmation
-        if (data.id === 2 && data.result) {
-            console.log('OP Subscription ID:', data.result);
-        }
+            // Listen for chain changes
+            window.ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
 
-        // Handle new block notifications
-        if (data.method === 'eth_subscription') {
-            // Skip if game is over
-            if (gameOver) return;
-
-            const blockHeader = data.params.result;
-            const blockNumber = parseInt(blockHeader.number, 16);
-
-            // Fetch full block with transaction count via HTTP
-            try {
-                const response = await fetch(`https://opt-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: 2,
-                        method: 'eth_getBlockByNumber',
-                        params: [blockHeader.number, false]
-                    })
-                });
-                const blockData = await response.json();
-                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
-
-                console.log('New OP block received!', {
-                    blockNumber: blockNumber,
-                    blockHash: blockHeader.hash,
-                    txCount: txCount
-                });
-
-                // Add to feed
-                addBlockToFeed('op', txCount, blockNumber);
-
-                // Spawn an OP block when new block detected
-                spawnBlockObstacle('op', txCount, blockNumber);
-            } catch (error) {
-                console.error('Error fetching OP block data:', error);
+        } catch (error) {
+            console.error('Error connecting wallet:', error);
+            if (error.code === 4001) {
+                alert('Please connect your wallet to continue');
+            } else {
+                alert('Failed to connect wallet. Please try again.');
             }
         }
-    };
-
-    ws.onerror = (error) => {
-        console.error('OP WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-        console.log('OP WebSocket connection closed. Reconnecting in 5 seconds...');
-        setTimeout(setupOPBlockListener, 5000);
-    };
+    } else {
+        // No wallet detected - provide helpful message
+        alert('No Web3 wallet detected!\n\nPlease install:\n- MetaMask (metamask.io)\n- Coinbase Wallet\n- Rainbow Wallet\n\nOr use a Web3-enabled browser.');
+    }
 }
 
-// WebSocket connection to listen for new blocks on Ethereum Mainnet
-function setupETHBlockListener() {
-    const ws = new WebSocket(`wss://eth-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
-
-    ws.onopen = () => {
-        console.log('Connected to Ethereum Mainnet WebSocket');
-
-        // Subscribe to new block headers
-        const subscribeMessage = JSON.stringify({
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'eth_subscribe',
-            params: ['newHeads']
-        });
-
-        ws.send(subscribeMessage);
-        console.log('Subscribed to ETH new blocks');
-    };
-
-    ws.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
-
-        // Handle subscription confirmation
-        if (data.id === 3 && data.result) {
-            console.log('ETH Subscription ID:', data.result);
-        }
-
-        // Handle new block notifications
-        if (data.method === 'eth_subscription') {
-            // Skip if game is over
-            if (gameOver) return;
-
-            const blockHeader = data.params.result;
-            const blockNumber = parseInt(blockHeader.number, 16);
-
-            // Fetch full block with transaction count via HTTP
-            try {
-                const response = await fetch(`https://eth-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: 3,
-                        method: 'eth_getBlockByNumber',
-                        params: [blockHeader.number, false]
-                    })
-                });
-                const blockData = await response.json();
-                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
-
-                console.log('New ETH block received!', {
-                    blockNumber: blockNumber,
-                    blockHash: blockHeader.hash,
-                    txCount: txCount
-                });
-
-                // Add to feed
-                addBlockToFeed('eth', txCount, blockNumber);
-
-                // Spawn an ETH block when new block detected
-                spawnBlockObstacle('eth', txCount, blockNumber);
-            } catch (error) {
-                console.error('Error fetching ETH block data:', error);
-            }
-        }
-    };
-
-    ws.onerror = (error) => {
-        console.error('ETH WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-        console.log('ETH WebSocket connection closed. Reconnecting in 5 seconds...');
-        setTimeout(setupETHBlockListener, 5000);
-    };
+// Disconnect wallet
+function disconnectWallet() {
+    connectedWallet = null;
+    provider = null;
+    document.getElementById('walletBtn').textContent = 'Connect Wallet';
+    document.getElementById('walletAddress').style.display = 'none';
+    console.log('Wallet disconnected');
 }
 
-// WebSocket connection to listen for new blocks on Arbitrum
-function setupARBBlockListener() {
-    const ws = new WebSocket(`wss://arb-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`);
+// Submit score to backend
+async function submitScore() {
+    if (!connectedWallet) {
+        alert('Please connect your wallet first!');
+        return;
+    }
 
-    ws.onopen = () => {
-        console.log('Connected to Arbitrum Mainnet WebSocket');
+    const submitBtn = document.getElementById('submitScoreBtn');
+    const statusDiv = document.getElementById('submissionStatus');
 
-        // Subscribe to new block headers
-        const subscribeMessage = JSON.stringify({
-            jsonrpc: '2.0',
-            id: 4,
-            method: 'eth_subscribe',
-            params: ['newHeads']
+    try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        statusDiv.textContent = 'Please sign the message in your wallet...';
+        statusDiv.style.color = '#ffff00';
+
+        // Create message to sign
+        const message = `I scored ${score} points in Vitalik Run!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
+
+        // Sign message
+        const signer = await provider.getSigner();
+        const signature = await signer.signMessage(message);
+
+        statusDiv.textContent = 'Submitting score to leaderboard...';
+
+        // Submit to backend
+        const response = await fetch(`${API_URL}/submit-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                walletAddress: connectedWallet,
+                score,
+                ethCollected,
+                blocksPassed: obstaclesPassed,
+                signature,
+                message
+            })
         });
 
-        ws.send(subscribeMessage);
-        console.log('Subscribed to ARB new blocks');
-    };
+        const result = await response.json();
 
-    ws.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
-
-        // Handle subscription confirmation
-        if (data.id === 4 && data.result) {
-            console.log('ARB Subscription ID:', data.result);
+        if (response.ok) {
+            statusDiv.textContent = `✅ Score submitted! Your rank: #${result.rank}`;
+            statusDiv.style.color = '#00ff00';
+            submitBtn.style.display = 'none';
+        } else {
+            statusDiv.textContent = `❌ ${result.error}`;
+            statusDiv.style.color = '#ff0000';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Score';
         }
+    } catch (error) {
+        console.error('Error submitting score:', error);
+        statusDiv.textContent = '❌ Failed to submit score. Please try again.';
+        statusDiv.style.color = '#ff0000';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Score';
+    }
+}
 
-        // Handle new block notifications
-        if (data.method === 'eth_subscription') {
-            // Skip if game is over
-            if (gameOver) return;
+// Fetch and display leaderboard
+async function loadLeaderboard() {
+    const modal = document.getElementById('leaderboardModal');
+    const entriesDiv = document.getElementById('leaderboardEntries');
 
-            const blockHeader = data.params.result;
-            const blockNumber = parseInt(blockHeader.number, 16);
+    modal.style.display = 'block';
+    entriesDiv.innerHTML = '<div style="text-align: center; color: #00ffff; padding: 40px;">Loading...</div>';
 
-            // Fetch full block with transaction count via HTTP
-            try {
-                const response = await fetch(`https://arb-mainnet.g.alchemy.com/v2/${config.ALCHEMY_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: 4,
-                        method: 'eth_getBlockByNumber',
-                        params: [blockHeader.number, false]
-                    })
-                });
-                const blockData = await response.json();
-                const txCount = blockData.result.transactions ? blockData.result.transactions.length : 0;
+    try {
+        const response = await fetch(`${API_URL}/leaderboard?limit=50&offset=0`);
+        const data = await response.json();
 
-                console.log('New ARB block received!', {
-                    blockNumber: blockNumber,
-                    blockHash: blockHeader.hash,
-                    txCount: txCount
-                });
+        if (data.leaderboard && data.leaderboard.length > 0) {
+            let html = `
+                <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 10px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 10px; font-weight: bold;">
+                    <div>Rank</div>
+                    <div>Wallet</div>
+                    <div>Score</div>
+                    <div>Details</div>
+                </div>
+            `;
 
-                // Add to feed
-                addBlockToFeed('arb', txCount, blockNumber);
+            data.leaderboard.forEach((entry, index) => {
+                const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                const address = entry.ens_name || `${entry.wallet_address.slice(0, 6)}...${entry.wallet_address.slice(-4)}`;
 
-                // Spawn an ARB block when new block detected
-                spawnBlockObstacle('arb', txCount, blockNumber);
-            } catch (error) {
-                console.error('Error fetching ARB block data:', error);
-            }
+                html += `
+                    <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${entry.wallet_address.toLowerCase() === connectedWallet?.toLowerCase() ? '#00ff00' : '#627EEA'};">
+                        <div style="font-size: 20px;">${rankEmoji} #${entry.rank}</div>
+                        <div style="color: #00ffff;">${address}</div>
+                        <div style="font-weight: bold; color: #ffff00;">${entry.score}</div>
+                        <div style="font-size: 12px; color: #aaa;">ETH: ${entry.eth_collected} | Blocks: ${entry.blocks_passed}</div>
+                    </div>
+                `;
+            });
+
+            entriesDiv.innerHTML = html;
+        } else {
+            entriesDiv.innerHTML = '<div style="text-align: center; color: #aaa; padding: 40px;">No scores yet. Be the first!</div>';
         }
-    };
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        entriesDiv.innerHTML = '<div style="text-align: center; color: #ff0000; padding: 40px;">Failed to load leaderboard.</div>';
+    }
+}
 
-    ws.onerror = (error) => {
-        console.error('ARB WebSocket error:', error);
-    };
+// Close leaderboard
+function closeLeaderboard() {
+    document.getElementById('leaderboardModal').style.display = 'none';
+}
 
-    ws.onclose = () => {
-        console.log('ARB WebSocket connection closed. Reconnecting in 5 seconds...');
-        setTimeout(setupARBBlockListener, 5000);
-    };
+// Event listeners for wallet and leaderboard
+document.getElementById('walletBtn').addEventListener('click', () => {
+    if (connectedWallet) {
+        disconnectWallet();
+    } else {
+        connectWallet();
+    }
+});
+
+document.getElementById('submitScoreBtn').addEventListener('click', submitScore);
+document.getElementById('leaderboardBtn').addEventListener('click', loadLeaderboard);
+document.getElementById('closeLeaderboard').addEventListener('click', closeLeaderboard);
+
+// Show submit button when game ends if wallet is connected
+function updateGameOverUI() {
+    if (connectedWallet) {
+        document.getElementById('submitScoreSection').style.display = 'block';
+        document.getElementById('submissionStatus').textContent = '';
+        const submitBtn = document.getElementById('submitScoreBtn');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Score';
+        submitBtn.style.display = 'inline-block';
+    } else {
+        document.getElementById('submitScoreSection').style.display = 'none';
+    }
 }
 
 // Start the game
 init();
 
-// Setup block listeners for all chains
-setupBlockListener();      // Base
-setupOPBlockListener();    // OP Mainnet
-setupETHBlockListener();   // Ethereum Mainnet
-setupARBBlockListener();   // Arbitrum
+// Setup blockchain listener (connects to backend SSE stream)
+setupBlockchainListener();

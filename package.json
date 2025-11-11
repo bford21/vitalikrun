@@ -1,0 +1,18 @@
+{
+  "name": "vitalikrun",
+  "version": "1.0.0",
+  "description": "Web3 endless runner game featuring Vitalik Buterin with real-time blockchain integration",
+  "main": "backend/src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "cd backend && npm install && npm start",
+    "dev": "cd backend && npm run dev",
+    "install-backend": "cd backend && npm install"
+  },
+  "keywords": ["web3", "game", "blockchain", "ethereum", "base", "optimism", "arbitrum"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
