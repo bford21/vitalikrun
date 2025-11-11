@@ -7,9 +7,18 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "serve -s dist -l ${PORT:-8080}",
     "backend": "cd backend && npm start"
   },
-  "keywords": ["web3", "game", "blockchain", "ethereum", "base", "optimism", "arbitrum"],
+  "keywords": [
+    "web3",
+    "game",
+    "blockchain",
+    "ethereum",
+    "base",
+    "optimism",
+    "arbitrum"
+  ],
   "author": "",
   "license": "MIT",
   "engines": {
@@ -27,6 +36,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "serve": "^14.2.5",
     "vite": "^5.4.11"
   }
 }

@@ -702,14 +702,18 @@ function animate() {
     // Always clean up blockchain blocks, even during game over
     // This prevents blocks from getting stuck on screen
     if (player && blockchainBlocks.length > 0) {
+        const beforeCount = blockchainBlocks.length;
+
         blockchainBlocks = blockchainBlocks.filter(block => {
             const worldPos = new THREE.Vector3();
             block.mesh.getWorldPosition(worldPos);
 
-            // Remove if it's behind the player by 15 units or more
-            // Blocks get detached from segments at z=20, so they stop moving there
-            // We need to clean them up before they accumulate
-            if (worldPos.z > player.position.z + 15) {
+            // Remove if it's behind the player by 5 units or more
+            // Blocks get stuck at z=10-12 when detached from segments
+            // With player at z=5, threshold of 5 gives us z>10
+            const threshold = player.position.z + 5;
+
+            if (worldPos.z > threshold) {
                 // Try to remove from segment group if still attached
                 if (block.segmentGroup) {
                     block.segmentGroup.remove(block.mesh);
@@ -718,11 +722,14 @@ function animate() {
                 scene.remove(block.mesh);
                 // Remove from obstacles array
                 obstacles = obstacles.filter(obs => obs !== block);
-                console.log('✅ Removed blockchain block at z:', worldPos.z.toFixed(2), 'player at:', player.position.z.toFixed(2));
                 return false;
             }
             return true;
         });
+
+        if (blockchainBlocks.length !== beforeCount) {
+            console.log(`🧹 Cleaned up ${beforeCount - blockchainBlocks.length} blocks. Remaining: ${blockchainBlocks.length}`);
+        }
     }
 
     renderer.render(scene, camera);
