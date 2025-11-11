@@ -1102,6 +1102,12 @@ function endGame() {
     updateGameOverUI();
 
     document.getElementById('gameOver').style.display = 'block';
+
+    // Hide mobile controls when game over
+    const mobileControls = document.getElementById('mobileControls');
+    if (mobileControls) {
+        mobileControls.classList.add('hidden');
+    }
 }
 
 // Restart game
@@ -1173,6 +1179,12 @@ window.restartGame = function() {
 
     document.getElementById('gameOver').style.display = 'none';
     document.getElementById('score').textContent = 'Score: 0';
+
+    // Show mobile controls when game restarts
+    const mobileControls = document.getElementById('mobileControls');
+    if (mobileControls) {
+        mobileControls.classList.remove('hidden');
+    }
 }
 
 // Add block to live feed
@@ -1398,29 +1410,16 @@ function disconnectBlockchainStream() {
 }
 
 // Wallet and Leaderboard functionality
-// Wallet state comes from React/RainbowKit or Farcaster
+// Wallet state comes from React/RainbowKit (including Farcaster embedded wallet)
 let connectedWallet = null;
 let provider = null;
-let farcasterFid = null;
-let farcasterUsername = null;
 
-// Listen for wallet changes from React or Farcaster auth
+// Listen for wallet changes from React
 window.addEventListener('walletChange', async (event) => {
-    const { address, isConnected, farcasterFid: fid, farcasterUsername: username } = event.detail;
+    const { address, isConnected } = event.detail;
 
-    // Farcaster authentication
-    if (fid) {
-        farcasterFid = fid;
-        farcasterUsername = username;
-        connectedWallet = null; // Don't use wallet in Farcaster mode
-        provider = null;
-        console.log('🟣 Farcaster user authenticated:', farcasterUsername, 'FID:', farcasterFid);
-    }
-    // Regular wallet authentication
-    else if (isConnected && address) {
+    if (isConnected && address) {
         connectedWallet = address;
-        farcasterFid = null;
-        farcasterUsername = null;
         // Get provider from window.ethereum for signing
         if (window.ethereum) {
             provider = new ethers.BrowserProvider(window.ethereum);
@@ -1429,8 +1428,6 @@ window.addEventListener('walletChange', async (event) => {
     } else {
         connectedWallet = null;
         provider = null;
-        farcasterFid = null;
-        farcasterUsername = null;
         console.log('Wallet disconnected');
     }
 
@@ -1442,8 +1439,7 @@ window.addEventListener('walletChange', async (event) => {
 
 // Submit score to backend
 async function submitScore() {
-    // Check if user is authenticated (either wallet or Farcaster)
-    if (!connectedWallet && !farcasterFid) {
+    if (!connectedWallet) {
         alert('Please connect your wallet first!');
         return;
     }
@@ -1454,51 +1450,30 @@ async function submitScore() {
     try {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
+        statusDiv.textContent = 'Please sign the message in your wallet...';
+        statusDiv.style.color = '#ffff00';
 
-        let requestBody;
+        // Create message to sign
+        const message = `I scored ${score} points in Vitalik Run!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
 
-        // Farcaster authentication (no signature needed)
-        if (farcasterFid) {
-            statusDiv.textContent = 'Submitting score to leaderboard...';
-            statusDiv.style.color = '#ffff00';
+        // Sign message
+        const signer = await provider.getSigner();
+        const signature = await signer.signMessage(message);
 
-            requestBody = {
-                farcasterFid,
-                farcasterUsername,
-                score,
-                ethCollected,
-                blocksPassed: obstaclesPassed
-            };
-        }
-        // Wallet authentication (needs signature)
-        else if (connectedWallet) {
-            statusDiv.textContent = 'Please sign the message in your wallet...';
-            statusDiv.style.color = '#ffff00';
+        statusDiv.textContent = 'Submitting score to leaderboard...';
 
-            // Create message to sign
-            const message = `I scored ${score} points in Vitalik Run!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
-
-            // Sign message
-            const signer = await provider.getSigner();
-            const signature = await signer.signMessage(message);
-
-            statusDiv.textContent = 'Submitting score to leaderboard...';
-
-            requestBody = {
+        // Submit to backend
+        const response = await fetch(`${API_URL}/submit-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 walletAddress: connectedWallet,
                 score,
                 ethCollected,
                 blocksPassed: obstaclesPassed,
                 signature,
                 message
-            };
-        }
-
-        // Submit to backend
-        const response = await fetch(`${API_URL}/submit-score`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+            })
         });
 
         const result = await response.json();

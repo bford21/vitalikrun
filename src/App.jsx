@@ -11,37 +11,17 @@ const queryClient = new QueryClient();
 function GameContainer() {
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
-  const { isFarcaster, context } = useFarcaster();
 
   useEffect(() => {
-    // In Farcaster, use FID for authentication
-    if (isFarcaster && context?.user) {
-      window.farcasterUser = context.user;
-      window.walletAddress = null; // Don't use wallet in Farcaster mode
-      window.isWalletConnected = false;
+    // Update wallet state for game.js
+    window.walletAddress = address || null;
+    window.isWalletConnected = isConnected;
+    window.openWalletModal = openConnectModal;
 
-      // Trigger Farcaster auth event
-      window.dispatchEvent(new CustomEvent('walletChange', {
-        detail: {
-          address: null,
-          isConnected: false,
-          farcasterFid: context.user.fid,
-          farcasterUsername: context.user.username
-        }
-      }));
-
-      console.log('🟣 Farcaster user:', context.user);
-    } else {
-      // Regular web/mobile: use wallet
-      window.walletAddress = address || null;
-      window.isWalletConnected = isConnected;
-      window.openWalletModal = openConnectModal;
-
-      window.dispatchEvent(new CustomEvent('walletChange', {
-        detail: { address, isConnected }
-      }));
-    }
-  }, [address, isConnected, openConnectModal, isFarcaster, context]);
+    window.dispatchEvent(new CustomEvent('walletChange', {
+      detail: { address, isConnected }
+    }));
+  }, [address, isConnected, openConnectModal]);
 
   return null;
 }
@@ -49,7 +29,7 @@ function GameContainer() {
 function WalletButton() {
   const { isFarcaster } = useFarcaster();
 
-  // Hide wallet button in Farcaster (auto-authenticated)
+  // Hide wallet button in Farcaster (auto-connects with embedded wallet)
   if (isFarcaster) {
     return null;
   }
