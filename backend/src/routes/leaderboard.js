@@ -9,7 +9,7 @@ const { verifySignature, validateScoreData } = require('../middleware/verify');
  */
 router.post('/submit-score', async (req, res) => {
   try {
-    const { walletAddress, score, ethCollected, blocksPassed, signature, message } = req.body;
+    const { walletAddress, score, ethCollected, blocksPassed, signature, message, farcasterData } = req.body;
 
     // Validate required fields
     if (!walletAddress || !score || !signature || !message) {
@@ -32,29 +32,67 @@ router.post('/submit-score', async (req, res) => {
     }
 
     // Insert or update score in database
-    const query = `
-      INSERT INTO leaderboard (wallet_address, score, eth_collected, blocks_passed, signature, message)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (wallet_address)
-      DO UPDATE SET
-        score = EXCLUDED.score,
-        eth_collected = EXCLUDED.eth_collected,
-        blocks_passed = EXCLUDED.blocks_passed,
-        signature = EXCLUDED.signature,
-        message = EXCLUDED.message,
-        updated_at = NOW()
-      WHERE EXCLUDED.score > leaderboard.score
-      RETURNING *;
-    `;
+    let query, queryParams;
 
-    const result = await pool.query(query, [
-      normalizedAddress,
-      score,
-      ethCollected,
-      blocksPassed,
-      signature,
-      message
-    ]);
+    if (farcasterData && farcasterData.fid) {
+      // User is from Farcaster - include Farcaster data
+      query = `
+        INSERT INTO leaderboard (wallet_address, score, eth_collected, blocks_passed, signature, message, farcaster_fid, farcaster_username, farcaster_display_name, farcaster_pfp_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (wallet_address)
+        DO UPDATE SET
+          score = EXCLUDED.score,
+          eth_collected = EXCLUDED.eth_collected,
+          blocks_passed = EXCLUDED.blocks_passed,
+          signature = EXCLUDED.signature,
+          message = EXCLUDED.message,
+          farcaster_fid = EXCLUDED.farcaster_fid,
+          farcaster_username = EXCLUDED.farcaster_username,
+          farcaster_display_name = EXCLUDED.farcaster_display_name,
+          farcaster_pfp_url = EXCLUDED.farcaster_pfp_url,
+          updated_at = NOW()
+        WHERE EXCLUDED.score > leaderboard.score
+        RETURNING *;
+      `;
+      queryParams = [
+        normalizedAddress,
+        score,
+        ethCollected,
+        blocksPassed,
+        signature,
+        message,
+        farcasterData.fid,
+        farcasterData.username || null,
+        farcasterData.displayName || null,
+        farcasterData.pfpUrl || null
+      ];
+    } else {
+      // Regular user - no Farcaster data
+      query = `
+        INSERT INTO leaderboard (wallet_address, score, eth_collected, blocks_passed, signature, message)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (wallet_address)
+        DO UPDATE SET
+          score = EXCLUDED.score,
+          eth_collected = EXCLUDED.eth_collected,
+          blocks_passed = EXCLUDED.blocks_passed,
+          signature = EXCLUDED.signature,
+          message = EXCLUDED.message,
+          updated_at = NOW()
+        WHERE EXCLUDED.score > leaderboard.score
+        RETURNING *;
+      `;
+      queryParams = [
+        normalizedAddress,
+        score,
+        ethCollected,
+        blocksPassed,
+        signature,
+        message
+      ];
+    }
+
+    const result = await pool.query(query, queryParams);
 
     // If no rows returned, it means the new score wasn't higher
     if (result.rows.length === 0) {
@@ -111,6 +149,10 @@ router.get('/leaderboard', async (req, res) => {
         blocks_passed,
         created_at,
         updated_at,
+        farcaster_fid,
+        farcaster_username,
+        farcaster_display_name,
+        farcaster_pfp_url,
         ROW_NUMBER() OVER (ORDER BY score DESC) as rank
       FROM leaderboard
       ORDER BY score DESC
@@ -154,6 +196,10 @@ router.get('/user-score/:address', async (req, res) => {
         blocks_passed,
         created_at,
         updated_at,
+        farcaster_fid,
+        farcaster_username,
+        farcaster_display_name,
+        farcaster_pfp_url,
         (SELECT COUNT(*) + 1 FROM leaderboard WHERE score > l.score) as rank
       FROM leaderboard l
       WHERE wallet_address = $1

@@ -1714,11 +1714,33 @@ window.addEventListener('walletChange', async (event) => {
 
     if (isConnected && address) {
         connectedWallet = address;
-        // Get provider from window.ethereum for signing
-        if (window.ethereum) {
-            provider = new ethers.BrowserProvider(window.ethereum);
+
+        // Get provider - use Farcaster SDK provider ONLY if in Farcaster mini app
+        if (isFarcaster && window.farcasterContext) {
+            try {
+                console.log('🟣 In Farcaster mini app - getting Farcaster wallet provider...');
+                // Import the SDK dynamically
+                const { sdk } = await import('@farcaster/miniapp-sdk');
+                const ethProvider = await sdk.wallet.getEthereumProvider();
+                provider = new ethers.BrowserProvider(ethProvider);
+                console.log('✅ Using Farcaster wallet provider for signing transactions');
+            } catch (error) {
+                console.error('❌ Failed to get Farcaster provider, falling back to browser wallet:', error);
+                // Fallback to window.ethereum
+                if (window.ethereum) {
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    console.log('✅ Using browser wallet provider (fallback)');
+                }
+            }
+        } else {
+            // Normal desktop/mobile web app - use browser wallet
+            if (window.ethereum) {
+                provider = new ethers.BrowserProvider(window.ethereum);
+                console.log('✅ Using browser wallet provider (MetaMask, Rainbow, Coinbase, etc.)');
+            }
         }
-        console.log('✅ Wallet connected:', connectedWallet, 'Farcaster:', isFarcasterApp);
+
+        console.log('✅ Wallet connected:', connectedWallet, 'isFarcaster:', isFarcasterApp, 'Provider:', provider ? 'Ready' : 'None');
     } else {
         connectedWallet = null;
         provider = null;
@@ -1756,18 +1778,35 @@ async function submitScore() {
 
         statusDiv.textContent = 'Submitting score to leaderboard...';
 
+        // Prepare submission data
+        const submissionData = {
+            walletAddress: connectedWallet,
+            score,
+            ethCollected,
+            blocksPassed: obstaclesPassed,
+            signature,
+            message
+        };
+
+        // Add Farcaster data if user is from Farcaster
+        if (isFarcasterApp && window.farcasterContext) {
+            const farcasterUser = window.farcasterContext.user;
+            if (farcasterUser) {
+                submissionData.farcasterData = {
+                    fid: farcasterUser.fid,
+                    username: farcasterUser.username,
+                    displayName: farcasterUser.displayName,
+                    pfpUrl: farcasterUser.pfpUrl
+                };
+                console.log('📝 Including Farcaster data in submission:', submissionData.farcasterData);
+            }
+        }
+
         // Submit to backend
         const response = await fetch(`${API_URL}/submit-score`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                walletAddress: connectedWallet,
-                score,
-                ethCollected,
-                blocksPassed: obstaclesPassed,
-                signature,
-                message
-            })
+            body: JSON.stringify(submissionData)
         });
 
         const result = await response.json();
@@ -1819,22 +1858,46 @@ async function loadLeaderboard() {
             // Display top 10
             data.leaderboard.forEach((entry, index) => {
                 const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
-                const address = entry.ens_name || `${entry.wallet_address.slice(0, 6)}...${entry.wallet_address.slice(-4)}`;
                 const isCurrentUser = entry.wallet_address.toLowerCase() === connectedWallet?.toLowerCase();
+                const isFarcasterUser = entry.farcaster_fid != null;
+
+                // Determine display name and profile picture
+                let displayName, profilePicture;
+                if (isFarcasterUser) {
+                    displayName = entry.farcaster_display_name || entry.farcaster_username || `@${entry.farcaster_username}`;
+                    profilePicture = entry.farcaster_pfp_url;
+                } else {
+                    displayName = entry.ens_name || `${entry.wallet_address.slice(0, 6)}...${entry.wallet_address.slice(-4)}`;
+                    profilePicture = null;
+                }
+
+                // Build clickable link for Farcaster users
+                const farcasterLink = isFarcasterUser ? `https://warpcast.com/${entry.farcaster_username}` : null;
+                const clickableStyle = farcasterLink ? 'cursor: pointer; transition: transform 0.2s;' : '';
+                const hoverEffect = farcasterLink ? 'onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"' : '';
+                const clickHandler = farcasterLink ? `onclick="window.open('${farcasterLink}', '_blank')"` : '';
 
                 if (isMobile) {
                     html += `
-                        <div style="display: grid; grid-template-columns: 50px 1fr 80px; gap: 8px; padding: 12px 8px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center; font-size: 13px;">
+                        <div style="display: grid; grid-template-columns: 50px 1fr 80px; gap: 8px; padding: 12px 8px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center; font-size: 13px; ${clickableStyle}" ${hoverEffect} ${clickHandler}>
                             <div style="font-size: 18px;">${rankEmoji} #${entry.rank}</div>
-                            <div style="color: #00ffff; font-size: 11px; overflow: hidden; text-overflow: ellipsis;">${address}${isCurrentUser ? ' (You)' : ''}</div>
+                            <div style="display: flex; align-items: center; gap: 6px; color: #00ffff; font-size: 11px; overflow: hidden;">
+                                ${profilePicture ? `<img src="${profilePicture}" alt="pfp" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />` : ''}
+                                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    ${displayName}${isCurrentUser ? ' (You)' : ''}${isFarcasterUser ? ' 🟣' : ''}
+                                </div>
+                            </div>
                             <div style="font-weight: bold; color: #ffff00; font-size: 15px;">${entry.score}</div>
                         </div>
                     `;
                 } else {
                     html += `
-                        <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center;">
+                        <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isCurrentUser ? '#00ff00' : '#627EEA'}; align-items: center; ${clickableStyle}" ${hoverEffect} ${clickHandler}>
                             <div style="font-size: 20px;">${rankEmoji} #${entry.rank}</div>
-                            <div style="color: #00ffff;">${address}${isCurrentUser ? ' (You)' : ''}</div>
+                            <div style="display: flex; align-items: center; gap: 10px; color: #00ffff;">
+                                ${profilePicture ? `<img src="${profilePicture}" alt="pfp" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" />` : ''}
+                                <div>${displayName}${isCurrentUser ? ' (You)' : ''}${isFarcasterUser ? ' 🟣' : ''}</div>
+                            </div>
                             <div style="font-weight: bold; color: #ffff00;">${entry.score}</div>
                             <div style="font-size: 12px; color: #aaa;">ETH: ${entry.eth_collected} | Blocks: ${entry.blocks_passed}</div>
                         </div>
@@ -1853,7 +1916,17 @@ async function loadLeaderboard() {
                         const userResponse = await fetch(`${API_URL}/user-score/${connectedWallet}`);
                         if (userResponse.ok) {
                             const userData = await userResponse.json();
-                            const address = userData.ens_name || `${userData.wallet_address.slice(0, 6)}...${userData.wallet_address.slice(-4)}`;
+                            const isFarcasterUser = userData.farcaster_fid != null;
+
+                            // Determine display name and profile picture
+                            let displayName, profilePicture;
+                            if (isFarcasterUser) {
+                                displayName = userData.farcaster_display_name || userData.farcaster_username || `@${userData.farcaster_username}`;
+                                profilePicture = userData.farcaster_pfp_url;
+                            } else {
+                                displayName = userData.ens_name || `${userData.wallet_address.slice(0, 6)}...${userData.wallet_address.slice(-4)}`;
+                                profilePicture = null;
+                            }
 
                             html += `
                                 <div style="margin: 20px 0 10px; padding: 10px; text-align: center; color: #00ffff; font-style: italic; font-size: ${isMobile ? '12px' : '14px'};">
@@ -1865,7 +1938,12 @@ async function loadLeaderboard() {
                                 html += `
                                     <div style="display: grid; grid-template-columns: 50px 1fr 80px; gap: 8px; padding: 12px 8px; background: rgba(0, 255, 0, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00ff00; align-items: center; font-size: 13px;">
                                         <div style="font-size: 18px;">#${userData.rank}</div>
-                                        <div style="color: #00ffff; font-size: 11px; overflow: hidden; text-overflow: ellipsis;">${address} (You)</div>
+                                        <div style="display: flex; align-items: center; gap: 6px; color: #00ffff; font-size: 11px; overflow: hidden;">
+                                            ${profilePicture ? `<img src="${profilePicture}" alt="pfp" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />` : ''}
+                                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                ${displayName} (You)${isFarcasterUser ? ' 🟣' : ''}
+                                            </div>
+                                        </div>
                                         <div style="font-weight: bold; color: #ffff00; font-size: 15px;">${userData.score}</div>
                                     </div>
                                 `;
@@ -1873,7 +1951,10 @@ async function loadLeaderboard() {
                                 html += `
                                     <div style="display: grid; grid-template-columns: 60px 1fr 120px 150px; gap: 10px; padding: 15px; background: rgba(0, 255, 0, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #00ff00; align-items: center;">
                                         <div style="font-size: 20px;">#${userData.rank}</div>
-                                        <div style="color: #00ffff;">${address} (You)</div>
+                                        <div style="display: flex; align-items: center; gap: 10px; color: #00ffff;">
+                                            ${profilePicture ? `<img src="${profilePicture}" alt="pfp" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" />` : ''}
+                                            <div>${displayName} (You)${isFarcasterUser ? ' 🟣' : ''}</div>
+                                        </div>
                                         <div style="font-weight: bold; color: #ffff00;">${userData.score}</div>
                                         <div style="font-size: 12px; color: #aaa;">ETH: ${userData.eth_collected} | Blocks: ${userData.blocks_passed}</div>
                                     </div>
