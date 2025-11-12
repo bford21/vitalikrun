@@ -11,17 +11,26 @@ const queryClient = new QueryClient();
 function GameContainer() {
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
+  const { isFarcaster } = useFarcaster();
 
   useEffect(() => {
     // Update wallet state for game.js
     window.walletAddress = address || null;
     window.isWalletConnected = isConnected;
     window.openWalletModal = openConnectModal;
+    window.isFarcasterApp = isFarcaster;
+
+    console.log('Wallet state update:', {
+      address,
+      isConnected,
+      isFarcaster,
+      isFarcasterApp: window.isFarcasterApp
+    });
 
     window.dispatchEvent(new CustomEvent('walletChange', {
-      detail: { address, isConnected }
+      detail: { address, isConnected, isFarcaster }
     }));
-  }, [address, isConnected, openConnectModal]);
+  }, [address, isConnected, openConnectModal, isFarcaster]);
 
   return null;
 }

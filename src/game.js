@@ -432,12 +432,12 @@ function createPowerupCoin() {
     return coinGroup;
 }
 
-// Create a magnetic powerup ETH coin (yellow, attracts coins)
+// Create a magnetic powerup ETH coin (cyan/blue, attracts coins)
 function createMagneticPowerupCoin() {
     const coinGroup = new THREE.Group();
 
-    // Larger, glowing Ethereum diamond with YELLOW glow for magnetic powerup
-    const glowColor = 0xFFFF00; // Bright yellow for magnetic powerup
+    // Larger, glowing Ethereum diamond with CYAN glow for magnetic powerup
+    const glowColor = 0x00FFFF; // Bright cyan/blue for magnetic powerup
     const material = new THREE.MeshPhongMaterial({
         color: glowColor,
         emissive: glowColor,
@@ -464,24 +464,24 @@ function createMagneticPowerupCoin() {
     bottomPyramid.receiveShadow = false;
     coinGroup.add(bottomPyramid);
 
-    // Add a bright yellow glowing point light around the powerup
+    // Add a bright cyan glowing point light around the powerup
     const glowLight = new THREE.PointLight(glowColor, 3, 8);
     glowLight.position.set(0, 0, 0);
     coinGroup.add(glowLight);
 
     // Mark this as a magnetic powerup for identification
     coinGroup.userData.isPowerup = true;
-    coinGroup.userData.powerupType = 'magnetic'; // Yellow = magnetic powerup
+    coinGroup.userData.powerupType = 'magnetic'; // Cyan = magnetic powerup
 
     return coinGroup;
 }
 
-// Create a giant powerup ETH coin (orange/red, makes player giant to smash blocks)
+// Create a giant powerup ETH coin (magenta/pink, makes player giant to smash blocks)
 function createGiantPowerupCoin() {
     const coinGroup = new THREE.Group();
 
-    // Larger, glowing Ethereum diamond with ORANGE/RED glow for giant powerup
-    const glowColor = 0xFF6600; // Bright orange for giant powerup
+    // Larger, glowing Ethereum diamond with MAGENTA glow for giant powerup
+    const glowColor = 0xFF00FF; // Bright magenta/pink for giant powerup
     const material = new THREE.MeshPhongMaterial({
         color: glowColor,
         emissive: glowColor,
@@ -508,14 +508,14 @@ function createGiantPowerupCoin() {
     bottomPyramid.receiveShadow = false;
     coinGroup.add(bottomPyramid);
 
-    // Add a bright orange glowing point light around the powerup
+    // Add a bright magenta glowing point light around the powerup
     const glowLight = new THREE.PointLight(glowColor, 3, 8);
     glowLight.position.set(0, 0, 0);
     coinGroup.add(glowLight);
 
     // Mark this as a giant powerup for identification
     coinGroup.userData.isPowerup = true;
-    coinGroup.userData.powerupType = 'giant'; // Orange = giant powerup
+    coinGroup.userData.powerupType = 'giant'; // Magenta = giant powerup
 
     return coinGroup;
 }
@@ -1703,10 +1703,14 @@ function disconnectBlockchainStream() {
 // Wallet state comes from React/RainbowKit (including Farcaster embedded wallet)
 let connectedWallet = null;
 let provider = null;
+let isFarcasterApp = false;
 
 // Listen for wallet changes from React
 window.addEventListener('walletChange', async (event) => {
-    const { address, isConnected } = event.detail;
+    const { address, isConnected, isFarcaster } = event.detail;
+
+    isFarcasterApp = isFarcaster || false;
+    console.log('Wallet change event:', { address, isConnected, isFarcaster, isFarcasterApp });
 
     if (isConnected && address) {
         connectedWallet = address;
@@ -1714,11 +1718,11 @@ window.addEventListener('walletChange', async (event) => {
         if (window.ethereum) {
             provider = new ethers.BrowserProvider(window.ethereum);
         }
-        console.log('Wallet connected:', connectedWallet);
+        console.log('✅ Wallet connected:', connectedWallet, 'Farcaster:', isFarcasterApp);
     } else {
         connectedWallet = null;
         provider = null;
-        console.log('Wallet disconnected');
+        console.log('❌ Wallet disconnected');
     }
 
     // Update game over UI if needed
@@ -1929,15 +1933,25 @@ function updateGameOverUI() {
     const connectWalletBtn = document.getElementById('connectWalletGameOverBtn');
     const statusDiv = document.getElementById('submissionStatus');
 
+    console.log('Updating game over UI:', { connectedWallet, isFarcasterApp });
+
     if (connectedWallet) {
+        // Wallet is connected - show submit button
         submitBtn.style.display = 'inline-block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit Score';
         connectWalletBtn.style.display = 'none';
         statusDiv.textContent = '';
-    } else {
+    } else if (isFarcasterApp) {
+        // In Farcaster but wallet not connected - show message
         submitBtn.style.display = 'none';
-        connectWalletBtn.style.display = window.isFarcasterApp ? 'none' : 'inline-block';
+        connectWalletBtn.style.display = 'none';
+        statusDiv.textContent = 'Connecting Farcaster wallet...';
+        statusDiv.style.color = '#ffff00';
+    } else {
+        // Regular web browser - show connect wallet button
+        submitBtn.style.display = 'none';
+        connectWalletBtn.style.display = 'inline-block';
         statusDiv.textContent = '';
     }
 }

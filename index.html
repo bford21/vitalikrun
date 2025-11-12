@@ -495,6 +495,7 @@
             color: #00ffff;
             text-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
             margin-bottom: 10px;
+            white-space: nowrap;
         }
 
         .welcome-content h2 {
@@ -518,6 +519,10 @@
             gap: 10px;
         }
 
+        .mechanic > span {
+            white-space: nowrap;
+        }
+
         .powerup-indicator {
             width: 40px;
             height: 40px;
@@ -534,36 +539,29 @@
             color: #00FF00;
         }
 
-        .powerup-indicator.yellow {
-            background: #FFFF00;
-            color: #FFFF00;
+        .powerup-indicator.cyan {
+            background: #00FFFF;
+            color: #00FFFF;
         }
 
-        .powerup-indicator.orange {
-            background: #FF6600;
-            color: #FF6600;
+        .powerup-indicator.magenta {
+            background: #FF00FF;
+            color: #FF00FF;
         }
 
         .eth-diamond {
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-bottom: 14px solid rgba(255, 255, 255, 0.9);
-            position: relative;
+            width: 24px;
+            height: 24px;
             margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .eth-diamond::after {
-            content: '';
-            position: absolute;
-            top: 14px;
-            left: -8px;
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 14px solid rgba(255, 255, 255, 0.9);
+        .eth-diamond svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 4px currentColor);
         }
 
         #startGameBtn {
@@ -626,7 +624,7 @@
 <body>
     <div id="welcomeScreen">
         <div class="welcome-content">
-            <h1>🏃 Run Vitalik, Run!</h1>
+            <h1>🏃 Run on Ethereum</h1>
 
             <div class="game-mechanics">
                 <div class="mechanic">
@@ -639,21 +637,36 @@
                 </div>
                 <div class="mechanic">
                     <div class="powerup-indicator green">
-                        <div class="eth-diamond"></div>
+                        <div class="eth-diamond">
+                            <svg viewBox="0 0 16 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 0L0 13L8 17.5L16 13L8 0Z" fill="rgba(255, 255, 255, 0.9)"/>
+                                <path d="M8 17.5L0 13L8 26L16 13L8 17.5Z" fill="rgba(255, 255, 255, 0.7)"/>
+                            </svg>
+                        </div>
                     </div>
                     <span><strong>Green</strong> - Clear all blocks temporarily</span>
                 </div>
                 <div class="mechanic">
-                    <div class="powerup-indicator yellow">
-                        <div class="eth-diamond"></div>
+                    <div class="powerup-indicator cyan">
+                        <div class="eth-diamond">
+                            <svg viewBox="0 0 16 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 0L0 13L8 17.5L16 13L8 0Z" fill="rgba(255, 255, 255, 0.9)"/>
+                                <path d="M8 17.5L0 13L8 26L16 13L8 17.5Z" fill="rgba(255, 255, 255, 0.7)"/>
+                            </svg>
+                        </div>
                     </div>
-                    <span><strong>Yellow</strong> - Attract coins magnetically</span>
+                    <span><strong>Cyan</strong> - Attract coins magnetically</span>
                 </div>
                 <div class="mechanic">
-                    <div class="powerup-indicator orange">
-                        <div class="eth-diamond"></div>
+                    <div class="powerup-indicator magenta">
+                        <div class="eth-diamond">
+                            <svg viewBox="0 0 16 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 0L0 13L8 17.5L16 13L8 0Z" fill="rgba(255, 255, 255, 0.9)"/>
+                                <path d="M8 17.5L0 13L8 26L16 13L8 17.5Z" fill="rgba(255, 255, 255, 0.7)"/>
+                            </svg>
+                        </div>
                     </div>
-                    <span><strong>Orange</strong> - Grow giant & smash through blocks!</span>
+                    <span><strong>Magenta</strong> - Grow giant & smash through blocks!</span>
                 </div>
             </div>
 
