@@ -1991,6 +1991,39 @@ function closeLeaderboard() {
     document.getElementById('leaderboardModal').style.display = 'none';
 }
 
+// Share score
+async function shareScore() {
+    if (isFarcasterApp && window.farcasterContext) {
+        // In Farcaster - use Farcaster mini app URL
+        const farcasterShareText = `I just scored ${score} points in Vitalik Run! 🏃\n\n💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nhttps://farcaster.xyz/miniapps/STldiUAWgnc4/running-on-ethereum`;
+
+        try {
+            const { sdk } = await import('@farcaster/miniapp-sdk');
+
+            // Open Farcaster composer with pre-filled text
+            await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(farcasterShareText)}`);
+
+            console.log('📤 Opened Farcaster composer with mini app URL');
+        } catch (error) {
+            console.error('Failed to open Farcaster composer:', error);
+            // Fallback to Twitter
+            const twitterShareText = `I just scored ${score} points in Vitalik Run! 🏃\n\n💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nPlay now: https://runvitalik.run`;
+            openTwitterShare(twitterShareText);
+        }
+    } else {
+        // On regular web - use Twitter/X with regular URL
+        const twitterShareText = `I just scored ${score} points in Vitalik Run! 🏃\n\n💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nPlay now: https://runvitalik.run`;
+        openTwitterShare(twitterShareText);
+    }
+}
+
+// Open Twitter share
+function openTwitterShare(text) {
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(twitterUrl, '_blank', 'width=550,height=420');
+    console.log('📤 Opened Twitter share');
+}
+
 // Mute/Unmute toggle
 function toggleMute() {
     isMuted = !isMuted;
@@ -2017,6 +2050,7 @@ document.getElementById('connectWalletGameOverBtn').addEventListener('click', ()
         window.openWalletModal();
     }
 });
+document.getElementById('shareScoreBtn').addEventListener('click', shareScore);
 document.getElementById('leaderboardBtn').addEventListener('click', loadLeaderboard);
 document.getElementById('closeLeaderboard').addEventListener('click', closeLeaderboard);
 

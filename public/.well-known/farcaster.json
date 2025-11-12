@@ -25,7 +25,8 @@
     "tagline": "Running Onchain",
     "ogTitle": "Running Onchain",
     "ogImageUrl": "https://runvitalik.run/og-image.png",
-    "ogDescription": "Dodge blocks from live Ethereum networks, collect ETH, and compete for the top score!"
+    "ogDescription": "Dodge blocks from live Ethereum networks, collect ETH, and compete for the top score!",
+    "castShareUrl": "https://runvitalik.run/splash.png"
   },
   "accountAssociation": {
     "header": "eyJmaWQiOjE5OTA2NywidHlwZSI6ImF1dGgiLCJrZXkiOiIweEYwODFENWU4NEFDQmE2MTY0RjVhNzQwQzQ5ZjY4RWEyNmMzZTk0NWUifQ",

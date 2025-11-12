@@ -4,26 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>">
-    <title>Run Vitalik Run</title>
+    <title>Running On Ethereum</title>
 
     <!-- Farcaster Mini App Metadata -->
     <meta name="fc:frame" content="vNext">
-    <meta name="fc:frame:image" content="https://vitalikrun.com/og-image.png">
+    <meta name="fc:frame:image" content="https://runvitalik.run/og-image.png">
     <meta name="fc:frame:button:1" content="Play Game">
     <meta name="fc:frame:button:1:action" content="launch_frame">
-    <meta name="fc:frame:button:1:target" content="https://vitalikrun.com">
+    <meta name="fc:frame:button:1:target" content="https://runvitalik.run">
 
     <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="Vitalik Run">
-    <meta property="og:description" content="Web3 endless runner game with real-time blockchain block spawning">
-    <meta property="og:image" content="https://vitalikrun.com/og-image.png">
+    <meta property="og:title" content="Running On Ethereum">
+    <meta property="og:description" content="Dodge blocks from live Ethereum networks, collect ETH, and compete for the top score!">
+    <meta property="og:image" content="https://runvitalik.run/og-image.png">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://runvitalik.run">
 
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Vitalik Run">
-    <meta name="twitter:description" content="Web3 endless runner game with real-time blockchain block spawning">
-    <meta name="twitter:image" content="https://vitalikrun.com/og-image.png">
+    <meta name="twitter:title" content="Running On Ethereum">
+    <meta name="twitter:description" content="Dodge blocks from live Ethereum networks, collect ETH, and compete for the top score!">
+    <meta name="twitter:image" content="https://runvitalik.run/og-image.png">
     <style>
         * {
             margin: 0;
@@ -206,6 +207,14 @@
 
         button[onclick="restartGame()"]:hover {
             background: #00DD77 !important;
+        }
+
+        #shareScoreBtn {
+            background: #9B59B6 !important;
+        }
+
+        #shareScoreBtn:hover {
+            background: #8E44AD !important;
         }
 
         #leaderboardBtn {
@@ -491,11 +500,11 @@
         }
 
         .welcome-content h1 {
-            font-size: 64px;
+            font-size: 48px;
             color: #00ffff;
             text-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
             margin-bottom: 10px;
-            white-space: nowrap;
+            line-height: 1.2;
         }
 
         .welcome-content h2 {
@@ -672,7 +681,7 @@
 <body>
     <div id="welcomeScreen">
         <div class="welcome-content">
-            <h1>🏃 Run on Ethereum</h1>
+            <h1>🏃 Running On Ethereum</h1>
 
             <div class="game-mechanics">
                 <div class="mechanic">
@@ -751,11 +760,16 @@
                         <span style="color: #FF6B6B;">📦 Blocks Passed:</span> <span id="obstaclesCount">0</span> × 100 = <span id="obstaclesPoints">0</span>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
-                    <button id="submitScoreBtn" style="display: none;">Submit Score</button>
-                    <button id="connectWalletGameOverBtn" style="display: none;">Connect Wallet</button>
-                    <button onclick="restartGame()">Play Again</button>
-                    <button id="leaderboardBtn">🏆 Leaderboard</button>
+                <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        <button id="submitScoreBtn" style="display: none;">Submit Score</button>
+                        <button id="connectWalletGameOverBtn" style="display: none;">Connect Wallet</button>
+                        <button onclick="restartGame()">Play Again</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        <button id="shareScoreBtn">📤 Share</button>
+                        <button id="leaderboardBtn">🏆 Leaderboard</button>
+                    </div>
                 </div>
                 <div id="submissionStatus" style="font-size: 14px; margin-top: 10px;"></div>
             </div>

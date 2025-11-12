@@ -1,4 +1,4 @@
-# Vitalik Run
+# Running On Ethereum
 
 Web3 endless runner game with real-time blockchain data.
 
