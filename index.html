@@ -520,7 +520,8 @@
         }
 
         .mechanic > span {
-            white-space: nowrap;
+            white-space: normal;
+            line-height: 1.4;
         }
 
         .powerup-indicator {
@@ -592,31 +593,78 @@
             }
 
             .welcome-content h1 {
-                font-size: 36px;
+                font-size: 28px;
+                white-space: normal;
+                line-height: 1.2;
             }
 
             .welcome-content h2 {
-                font-size: 18px;
+                font-size: 16px;
             }
 
             .game-mechanics {
-                font-size: 14px;
+                font-size: 13px;
                 max-width: 100%;
+                line-height: 1.6;
             }
 
             .mechanic {
-                font-size: 14px;
+                font-size: 13px;
+                gap: 8px;
+            }
+
+            .mechanic > span {
+                white-space: normal;
+                line-height: 1.3;
             }
 
             .powerup-indicator {
-                width: 35px;
-                height: 35px;
+                width: 32px;
+                height: 32px;
+            }
+
+            .eth-diamond {
+                width: 20px;
+                height: 20px;
             }
 
             #startGameBtn {
-                font-size: 20px;
+                font-size: 18px;
                 padding: 15px 40px;
                 width: 100%;
+                margin-top: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .welcome-content {
+                margin: 15px;
+                padding: 20px 12px;
+            }
+
+            .welcome-content h1 {
+                font-size: 24px;
+            }
+
+            .game-mechanics {
+                font-size: 12px;
+                margin: 20px auto;
+            }
+
+            .mechanic {
+                font-size: 12px;
+                gap: 6px;
+                margin-bottom: 12px;
+            }
+
+            .powerup-indicator {
+                width: 28px;
+                height: 28px;
+            }
+
+            .eth-diamond {
+                width: 18px;
+                height: 18px;
             }
         }
     </style>

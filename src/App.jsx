@@ -1,6 +1,6 @@
 import '@rainbow-me/rainbowkit/styles.css';
 import { ConnectButton, RainbowKitProvider, useConnectModal } from '@rainbow-me/rainbowkit';
-import { WagmiProvider, useAccount } from 'wagmi';
+import { WagmiProvider, useAccount, useConnect } from 'wagmi';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { config } from './wagmi';
 import { useEffect } from 'react';
@@ -11,7 +11,29 @@ const queryClient = new QueryClient();
 function GameContainer() {
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
-  const { isFarcaster } = useFarcaster();
+  const { isFarcaster, isLoading } = useFarcaster();
+  const { connect, connectors } = useConnect();
+
+  // Auto-connect Farcaster wallet when in Farcaster app
+  useEffect(() => {
+    if (isFarcaster && !isConnected && !isLoading) {
+      console.log('🟣 Attempting to auto-connect Farcaster wallet...');
+      console.log('🟣 Available connectors:', connectors.map(c => ({ id: c.id, name: c.name, type: c.type })));
+
+      const farcasterConnector = connectors.find(c => c.id === 'farcaster');
+      if (farcasterConnector) {
+        console.log('🟣 Found Farcaster connector:', farcasterConnector);
+        try {
+          connect({ connector: farcasterConnector });
+          console.log('🟣 Connect called successfully');
+        } catch (error) {
+          console.error('❌ Failed to connect:', error);
+        }
+      } else {
+        console.log('⚠️ Farcaster connector not found. Available:', connectors.map(c => c.id));
+      }
+    }
+  }, [isFarcaster, isConnected, isLoading, connect, connectors]);
 
   useEffect(() => {
     // Update wallet state for game.js
