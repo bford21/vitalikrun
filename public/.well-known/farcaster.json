@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "name": "Vitalik Run",
+  "iconUrl": "https://runvitalik.run/icon-512.png",
+  "homeUrl": "https://runvitalik.run",
+  "splashImageUrl": "https://runvitalik.run/splash.png",
+  "splashBackgroundColor": "#87CEEB",
+  "description": "Web3 endless runner game with real-time blockchain blocks. Dodge blocks from live Ethereum networks, collect ETH, and compete for the top score!",
+  "ogTitle": "Vitalik Run - Web3 Endless Runner",
+  "ogDescription": "Play the Web3 endless runner featuring real-time blockchain blocks from Ethereum, Base, and Optimism. Dodge, collect, and dominate the leaderboard!",
+  "ogImage": "https://runvitalik.run/og-image.png"
+}

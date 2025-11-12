@@ -1812,9 +1812,18 @@ async function submitScore() {
         const result = await response.json();
 
         if (response.ok) {
-            statusDiv.textContent = `✅ Score submitted! Your rank: #${result.rank}`;
-            statusDiv.style.color = '#00ff00';
-            submitBtn.style.display = 'none';
+            if (result.success === false) {
+                // Score wasn't high enough to update
+                statusDiv.textContent = `Score not improved. Your best: ${result.currentScore}`;
+                statusDiv.style.color = '#ffff00';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Score';
+            } else {
+                // Score successfully submitted
+                statusDiv.textContent = `✅ Score submitted! Your rank: #${result.rank}`;
+                statusDiv.style.color = '#00ff00';
+                submitBtn.style.display = 'none';
+            }
         } else {
             statusDiv.textContent = `❌ ${result.error}`;
             statusDiv.style.color = '#ff0000';
