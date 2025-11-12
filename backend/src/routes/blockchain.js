@@ -11,7 +11,8 @@ function initializeBlockchainConnections() {
     { name: 'base', url: `wss://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`, httpUrl: 'https://base-mainnet.g.alchemy.com/v2' },
     { name: 'op', url: `wss://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`, httpUrl: 'https://opt-mainnet.g.alchemy.com/v2' },
     { name: 'eth', url: `wss://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`, httpUrl: 'https://eth-mainnet.g.alchemy.com/v2' },
-    { name: 'arb', url: `wss://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`, httpUrl: 'https://arb-mainnet.g.alchemy.com/v2' }
+    // Arbitrum disabled
+    // { name: 'arb', url: `wss://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`, httpUrl: 'https://arb-mainnet.g.alchemy.com/v2' }
   ];
 
   chains.forEach(chain => {

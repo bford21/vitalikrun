@@ -617,8 +617,8 @@ function update(deltaTime) {
     // Update score display
     document.getElementById('score').textContent = `Score: ${score}`;
 
-    // Increase speed over time
-    gameSpeed += 0.0001;
+    // Increase speed over time - game gets progressively harder
+    gameSpeed += 0.0003;
 
     // Move active player towards target lane
     const targetX = lanes[currentLane];
@@ -827,10 +827,23 @@ function update(deltaTime) {
         const worldPos = new THREE.Vector3();
         obstacle.getWorldPosition(worldPos);
 
-        const distance = activePlayer.position.distanceTo(worldPos);
+        // Calculate distances in X and Z separately for better collision detection
+        const dx = Math.abs(activePlayer.position.x - worldPos.x);
+        const dz = Math.abs(activePlayer.position.z - worldPos.z);
+        const dy = Math.abs(activePlayer.position.y - worldPos.y);
 
-        // Check for collision
-        if (distance < 1.5 && Math.abs(activePlayer.position.y - worldPos.y) < 1.5) {
+        // Get the block's geometry to determine its size
+        const blockGeometry = obstacle.geometry;
+        const blockSize = blockGeometry ? blockGeometry.parameters.width : 1.5;
+        const blockHeight = blockGeometry ? blockGeometry.parameters.height : 2;
+
+        // Check for collision using box collision (more accurate than distance)
+        // Player is roughly 1 unit wide/deep, block varies in size
+        const collisionRadiusX = (blockSize / 2) + 0.5; // Half block width + half player width
+        const collisionRadiusZ = (blockSize / 2) + 0.5; // Half block depth + half player depth
+        const collisionRadiusY = (blockHeight / 2) + 0.5; // Half block height + half player height
+
+        if (dx < collisionRadiusX && dz < collisionRadiusZ && dy < collisionRadiusY) {
             endGame();
         }
 
@@ -1220,16 +1233,6 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
         return;
     }
 
-    // Dynamic spawn probability based on game speed
-    // As speed increases, spawn fewer blocks to allow landing space
-    // At speed 0.2 (start): 100% spawn rate
-    // At speed 0.5+: 40% spawn rate
-    const speedFactor = Math.max(0.4, 1 - (gameSpeed - 0.2) * 1.5);
-    if (Math.random() > speedFactor) {
-        console.log(`⏭️ Block spawn skipped (speed: ${gameSpeed.toFixed(2)}, spawn chance: ${(speedFactor * 100).toFixed(0)}%)`);
-        return;
-    }
-
     // Determine block size based on transaction count
     let blockSize;
     let blockHeight;
@@ -1294,28 +1297,69 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
     // Pick a random available lane
     const laneidx = availableLanes[Math.floor(Math.random() * availableLanes.length)];
 
-    // Load appropriate texture based on block type
-    const textureLoader = new THREE.TextureLoader();
-    let texturePath;
+    // Define chain-specific colors and logos
+    let glowColor, baseColor, logoPath;
     if (blockType === 'op') {
-        texturePath = '/op.png';
+        glowColor = 0xff0420; // Red glow for Optimism
+        baseColor = 0xff0420;
+        logoPath = '/op.png';
     } else if (blockType === 'eth') {
-        texturePath = '/eth.png';
+        glowColor = 0x627eea; // Blue/purple glow for Ethereum
+        baseColor = 0x627eea;
+        logoPath = '/eth.png';
     } else if (blockType === 'arb') {
-        texturePath = '/arb.png';
+        glowColor = 0x28a0f0; // Light blue glow for Arbitrum
+        baseColor = 0x28a0f0;
+        logoPath = '/arb.png';
     } else {
-        texturePath = '/base.png';
+        glowColor = 0x0052ff; // Blue glow for Base
+        baseColor = 0x0052ff;
+        logoPath = '/base.png';
     }
-    const blockTexture = textureLoader.load(texturePath);
-    blockTexture.colorSpace = THREE.SRGBColorSpace;
 
-    // Create white block with blockchain logo texture using MeshBasicMaterial to preserve colors
+    // Create the main block with slight transparency
     const blockGeometry = new THREE.BoxGeometry(blockSize, blockHeight, blockSize);
-    const blockMaterial = new THREE.MeshBasicMaterial({
-        map: blockTexture,
-        color: 0xffffff // White base color
+    const blockMaterial = new THREE.MeshStandardMaterial({
+        color: baseColor,
+        transparent: true,
+        opacity: 0.85,
+        emissive: baseColor,
+        emissiveIntensity: 0.3,
+        roughness: 0.3,
+        metalness: 0.7
     });
     const blockObstacle = new THREE.Mesh(blockGeometry, blockMaterial);
+
+    // Create outer glow effect
+    const glowGeometry = new THREE.BoxGeometry(blockSize * 1.15, blockHeight * 1.15, blockSize * 1.15);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: glowColor,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.BackSide
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    blockObstacle.add(glowMesh);
+
+    // Add logo badge on the front face
+    const textureLoader = new THREE.TextureLoader();
+    const logoTexture = textureLoader.load(logoPath);
+    logoTexture.colorSpace = THREE.SRGBColorSpace;
+    logoTexture.minFilter = THREE.LinearFilter;
+    logoTexture.magFilter = THREE.LinearFilter;
+
+    const badgeSize = blockSize * 0.5;
+    const badgeGeometry = new THREE.PlaneGeometry(badgeSize, badgeSize);
+    const badgeMaterial = new THREE.MeshBasicMaterial({
+        map: logoTexture,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false
+    });
+    const badge = new THREE.Mesh(badgeGeometry, badgeMaterial);
+    badge.position.set(0, 0, blockSize / 2 + 0.01); // Slightly in front of the block
+    badge.renderOrder = 1; // Render after the block
+    blockObstacle.add(badge);
 
     blockObstacle.position.set(lanes[laneidx], blockHeight / 2, blockZ);
 
