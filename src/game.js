@@ -44,6 +44,10 @@ let powerupEndTime = 0;
 let blockSpawnDelay = 0; // Timestamp when blocks can spawn again
 let magneticPowerupActive = false; // Magnetic coin attraction powerup
 let magneticPowerupEndTime = 0;
+let giantPowerupActive = false; // Giant powerup - smash through blocks
+let giantPowerupEndTime = 0;
+let brokenBlockParticles = []; // Ethereum particles from broken blocks
+let gameStarted = false; // Track if player has clicked Start Game
 
 // Blockchain stream management
 let eventSource = null;
@@ -145,8 +149,40 @@ function init() {
     // Create subtle matrix rain
     createMatrixRain();
 
+    // Setup welcome screen
+    setupWelcomeScreen();
+
     // Start animation loop
     animate();
+}
+
+// Setup welcome screen
+function setupWelcomeScreen() {
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    const startGameBtn = document.getElementById('startGameBtn');
+
+    if (startGameBtn) {
+        startGameBtn.addEventListener('click', () => {
+            welcomeScreen.classList.add('hidden');
+
+            // Mark game as started
+            gameStarted = true;
+
+            // Start blockchain stream
+            connectBlockchainStream();
+
+            // Start background music
+            if (!isMuted) {
+                backgroundMusic.play().catch(e => console.log('Music play failed:', e));
+            }
+
+            // Show mobile controls if on mobile
+            const mobileControls = document.getElementById('mobileControls');
+            if (mobileControls) {
+                mobileControls.classList.remove('hidden');
+            }
+        });
+    }
 }
 
 // Create subtle falling matrix symbols
@@ -440,6 +476,50 @@ function createMagneticPowerupCoin() {
     return coinGroup;
 }
 
+// Create a giant powerup ETH coin (orange/red, makes player giant to smash blocks)
+function createGiantPowerupCoin() {
+    const coinGroup = new THREE.Group();
+
+    // Larger, glowing Ethereum diamond with ORANGE/RED glow for giant powerup
+    const glowColor = 0xFF6600; // Bright orange for giant powerup
+    const material = new THREE.MeshPhongMaterial({
+        color: glowColor,
+        emissive: glowColor,
+        emissiveIntensity: 1.0, // Maximum glow intensity
+        flatShading: true
+    });
+
+    // Top pyramid (pointing up) - larger size
+    const topGeometry = new THREE.ConeGeometry(0.6, 0.7, 4);
+    const topPyramid = new THREE.Mesh(topGeometry, material);
+    topPyramid.position.y = 0.35;
+    topPyramid.rotation.y = Math.PI / 4;
+    topPyramid.castShadow = false;
+    topPyramid.receiveShadow = false;
+    coinGroup.add(topPyramid);
+
+    // Bottom pyramid (pointing down) - larger size
+    const bottomGeometry = new THREE.ConeGeometry(0.6, 0.7, 4);
+    const bottomPyramid = new THREE.Mesh(bottomGeometry, material);
+    bottomPyramid.position.y = -0.35;
+    bottomPyramid.rotation.y = Math.PI / 4;
+    bottomPyramid.rotation.z = Math.PI;
+    bottomPyramid.castShadow = false;
+    bottomPyramid.receiveShadow = false;
+    coinGroup.add(bottomPyramid);
+
+    // Add a bright orange glowing point light around the powerup
+    const glowLight = new THREE.PointLight(glowColor, 3, 8);
+    glowLight.position.set(0, 0, 0);
+    coinGroup.add(glowLight);
+
+    // Mark this as a giant powerup for identification
+    coinGroup.userData.isPowerup = true;
+    coinGroup.userData.powerupType = 'giant'; // Orange = giant powerup
+
+    return coinGroup;
+}
+
 // Create a ground segment
 function createGroundSegment(zPos, skipObstacles = false) {
     const group = new THREE.Group();
@@ -495,10 +575,13 @@ function createGroundSegment(zPos, skipObstacles = false) {
 
     // Add coins (but not if skipObstacles is true)
     if (!skipObstacles) {
-        // 2.5% chance to spawn a powerup instead of regular coins
+        // 2.5% chance to spawn a powerup
         if (Math.random() < 0.025) {
-            // 50/50 chance between green (clear blocks) and yellow (magnetic) powerup
-            const powerup = Math.random() < 0.5 ? createPowerupCoin() : createMagneticPowerupCoin();
+            // Equal chance between green (clear blocks), yellow (magnetic), and orange (giant) powerup
+            const rand = Math.random();
+            const powerup = rand < 0.33 ? createPowerupCoin() :
+                           rand < 0.66 ? createMagneticPowerupCoin() :
+                           createGiantPowerupCoin();
             const laneidx = Math.floor(Math.random() * 3);
             const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
             powerup.position.set(lanes[laneidx], 1.5, powerupZ);
@@ -610,6 +693,9 @@ function onWindowResize() {
 // Update game state
 function update(deltaTime) {
     if (gameOver || !player) return;
+
+    // Don't update game logic until player clicks Start Game
+    if (!gameStarted) return;
 
     // Get the currently active player model (forward or backward)
     const activePlayer = powerupActive && scene.children.includes(backwardPlayer) ? backwardPlayer : player;
@@ -743,10 +829,13 @@ function update(deltaTime) {
                     });
                 }
             } else {
-                // 2.5% chance to spawn a powerup instead of regular coins
+                // 2.5% chance to spawn a powerup
                 if (Math.random() < 0.025) {
-                    // 50/50 chance between green (clear blocks) and yellow (magnetic) powerup
-                    const powerup = Math.random() < 0.5 ? createPowerupCoin() : createMagneticPowerupCoin();
+                    // Equal chance between green (clear blocks), yellow (magnetic), and orange (giant) powerup
+                    const rand = Math.random();
+                    const powerup = rand < 0.33 ? createPowerupCoin() :
+                                   rand < 0.66 ? createMagneticPowerupCoin() :
+                                   createGiantPowerupCoin();
                     const laneidx = Math.floor(Math.random() * 3);
                     const powerupZ = -GROUND_LENGTH/2 + Math.random() * GROUND_LENGTH;
                     powerup.position.set(lanes[laneidx], 1.5, powerupZ);
@@ -822,7 +911,8 @@ function update(deltaTime) {
     }
 
     // Check collision with obstacles and track passed obstacles (using activePlayer from update() scope)
-    obstacles.forEach(obsObj => {
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obsObj = obstacles[i];
         const obstacle = obsObj.mesh;
         const worldPos = new THREE.Vector3();
         obstacle.getWorldPosition(worldPos);
@@ -844,7 +934,40 @@ function update(deltaTime) {
         const collisionRadiusY = (blockHeight / 2) + 0.5; // Half block height + half player height
 
         if (dx < collisionRadiusX && dz < collisionRadiusZ && dy < collisionRadiusY) {
-            endGame();
+            // If giant powerup is active, break the block instead of ending game
+            if (giantPowerupActive) {
+                console.log('💥 SMASHING BLOCK!');
+
+                // Get block info for particle generation
+                const blockType = obsObj.blockType || 'eth';
+                const txCount = obsObj.txCount || 100;
+
+                // Create ethereum particles
+                createBlockParticles(worldPos, blockType, txCount);
+
+                // Remove block from scene
+                if (obsObj.segmentGroup) {
+                    obsObj.segmentGroup.remove(obstacle);
+                }
+                scene.remove(obstacle);
+
+                // Remove from obstacles array
+                obstacles.splice(i, 1);
+
+                // Remove from blockchain blocks if it's there
+                const blockIndex = blockchainBlocks.findIndex(b => b.mesh === obstacle);
+                if (blockIndex !== -1) {
+                    blockchainBlocks.splice(blockIndex, 1);
+                }
+
+                // Count as passed obstacle
+                obstaclesPassed++;
+                score = (ethCollected * 100) + (obstaclesPassed * 100);
+
+                continue;
+            } else {
+                endGame();
+            }
         }
 
         // Check if player passed the obstacle (obstacle is now behind player)
@@ -854,7 +977,7 @@ function update(deltaTime) {
             score = (ethCollected * 100) + (obstaclesPassed * 100);
             console.log('Obstacle passed! Total passed:', obstaclesPassed, 'Score:', score);
         }
-    });
+    }
 
     // Check coin collection - iterate backwards to safely remove items
     for (let i = coins.length - 1; i >= 0; i--) {
@@ -905,6 +1028,8 @@ function update(deltaTime) {
             // Activate appropriate powerup based on type
             if (powerup.userData.powerupType === 'magnetic') {
                 activateMagneticPowerup();
+            } else if (powerup.userData.powerupType === 'giant') {
+                activateGiantPowerup();
             } else {
                 activatePowerup(); // Green powerup
             }
@@ -945,6 +1070,52 @@ function update(deltaTime) {
     }
     if (magneticPowerupActive && Date.now() >= magneticPowerupEndTime) {
         deactivateMagneticPowerup();
+    }
+    if (giantPowerupActive && Date.now() >= giantPowerupEndTime) {
+        deactivateGiantPowerup();
+    }
+
+    // Animate broken block particles
+    for (let i = brokenBlockParticles.length - 1; i >= 0; i--) {
+        const particle = brokenBlockParticles[i];
+
+        // Apply gravity
+        particle.velocity.y -= 0.01;
+        particle.mesh.position.add(particle.velocity);
+
+        // Rotate particle
+        particle.mesh.rotation.x += particle.rotationSpeed.x;
+        particle.mesh.rotation.y += particle.rotationSpeed.y;
+        particle.mesh.rotation.z += particle.rotationSpeed.z;
+
+        // Check if player collected it
+        if (activePlayer) {
+            const dx = activePlayer.position.x - particle.mesh.position.x;
+            const dz = activePlayer.position.z - particle.mesh.position.z;
+            const distance2D = Math.sqrt(dx * dx + dz * dz);
+
+            if (distance2D < 1.2 && particle.mesh.position.y > 0) {
+                ethCollected++;
+                score = (ethCollected * 100) + (obstaclesPassed * 100);
+                scene.remove(particle.mesh);
+                brokenBlockParticles.splice(i, 1);
+
+                // Play coin sound
+                if (!isMuted) {
+                    coinSound.currentTime = 0;
+                    coinSound.play().catch(e => console.log('Audio play failed:', e));
+                }
+
+                console.log('Particle ETH collected! Total ETH:', ethCollected);
+                continue;
+            }
+        }
+
+        // Remove if fallen through floor or off the track
+        if (particle.mesh.position.y < -5 || Math.abs(particle.mesh.position.x) > 10) {
+            scene.remove(particle.mesh);
+            brokenBlockParticles.splice(i, 1);
+        }
     }
 }
 
@@ -1044,6 +1215,79 @@ function activateMagneticPowerup() {
 function deactivateMagneticPowerup() {
     console.log('🧲 Magnetic powerup ended');
     magneticPowerupActive = false;
+}
+
+// Activate giant powerup: make player 2x size, can smash through blocks
+function activateGiantPowerup() {
+    console.log('💪 Activating GIANT powerup!');
+    giantPowerupActive = true;
+    giantPowerupEndTime = Date.now() + 10000; // 10 seconds duration
+
+    // Scale the player to 2x size
+    if (player && scene.children.includes(player)) {
+        player.scale.set(2, 2, 2);
+    }
+    if (backwardPlayer && scene.children.includes(backwardPlayer)) {
+        backwardPlayer.scale.set(2, 2, 2);
+    }
+}
+
+// Deactivate giant powerup: return player to normal size
+function deactivateGiantPowerup() {
+    console.log('💪 Giant powerup ended');
+    giantPowerupActive = false;
+
+    // Reset player scale to normal
+    if (player) {
+        player.scale.set(1, 1, 1);
+    }
+    if (backwardPlayer) {
+        backwardPlayer.scale.set(1, 1, 1);
+    }
+}
+
+// Create ethereum symbol particles when a block is broken
+function createBlockParticles(blockPosition, blockType, txCount) {
+    console.log('💥 Breaking block! Creating ETH particles');
+
+    // Determine number of particles based on transaction count
+    const particleCount = Math.min(Math.floor(txCount / 10) + 3, 15); // 3-15 particles
+
+    for (let i = 0; i < particleCount; i++) {
+        // Create small ETH coin
+        const particle = createEthCoin();
+        particle.scale.set(0.5, 0.5, 0.5); // 50% of normal size
+
+        // Position at block location with slight randomness
+        particle.position.set(
+            blockPosition.x + (Math.random() - 0.5) * 2,
+            blockPosition.y + (Math.random() - 0.5) * 2,
+            blockPosition.z + (Math.random() - 0.5) * 2
+        );
+
+        // Add to scene
+        scene.add(particle);
+
+        // Random velocity for scatter effect
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.15,
+            Math.random() * 0.2 + 0.1, // Upward bias
+            (Math.random() - 0.5) * 0.15
+        );
+
+        // Random rotation speeds
+        const rotationSpeed = {
+            x: (Math.random() - 0.5) * 0.1,
+            y: (Math.random() - 0.5) * 0.1,
+            z: (Math.random() - 0.5) * 0.1
+        };
+
+        brokenBlockParticles.push({
+            mesh: particle,
+            velocity: velocity,
+            rotationSpeed: rotationSpeed
+        });
+    }
 }
 
 // Animation loop
@@ -1178,6 +1422,7 @@ window.restartGame = function() {
     obstaclesPassed = 0;
     gameSpeed = 0.2;
     gameOver = false;
+    gameStarted = true; // Game is active again
     isJumping = false;
     jumpVelocity = 0;
     segmentCounter = 0; // Reset segment counter for safe zones
@@ -1375,7 +1620,8 @@ function spawnBlockObstacle(blockType = 'base', txCount = 0, blockNumber = 0) {
         mesh: blockObstacle,
         segmentGroup: furthestSegment,
         isBlockchainBlock: true,
-        blockType: blockType
+        blockType: blockType,
+        txCount: txCount
     };
     obstacles.push(blockData);
     blockchainBlocks.push(blockData);
@@ -1714,8 +1960,8 @@ backgroundMusic.play().catch(e => {
     document.addEventListener('keydown', startMusic);
 });
 
-// Connect to blockchain stream on page load
-connectBlockchainStream();
+// Don't auto-connect to blockchain stream - wait for user to start game
+// connectBlockchainStream();
 
 // Notify Farcaster that app is ready (if running as mini app)
 // Call this unconditionally - it will only work if actually in Farcaster

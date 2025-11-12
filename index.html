@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>">
-    <title>Vitalik Run - Web3 Endless Runner</title>
+    <title>Run Vitalik Run</title>
 
     <!-- Farcaster Mini App Metadata -->
     <meta name="fc:frame" content="vNext">
@@ -263,6 +263,7 @@
         }
 
         #mobileControls.hidden {
+            display: none !important;
             opacity: 0;
             pointer-events: none;
         }
@@ -457,9 +458,209 @@
                 padding: 12px 25px;
             }
         }
+
+        /* Welcome Screen Styles */
+        #welcomeScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 200;
+            overflow-y: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #welcomeScreen.hidden {
+            display: none;
+        }
+
+        .welcome-content {
+            max-width: 700px;
+            margin: 50px auto;
+            background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #627EEA;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            text-align: center;
+            color: white;
+        }
+
+        .welcome-content h1 {
+            font-size: 64px;
+            color: #00ffff;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
+            margin-bottom: 10px;
+        }
+
+        .welcome-content h2 {
+            font-size: 24px;
+            color: #627EEA;
+            margin-bottom: 30px;
+        }
+
+        .game-mechanics {
+            text-align: left;
+            margin: 30px auto;
+            max-width: 550px;
+            line-height: 2;
+        }
+
+        .mechanic {
+            margin-bottom: 15px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .powerup-indicator {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        .powerup-indicator.green {
+            background: #00FF00;
+            color: #00FF00;
+        }
+
+        .powerup-indicator.yellow {
+            background: #FFFF00;
+            color: #FFFF00;
+        }
+
+        .powerup-indicator.orange {
+            background: #FF6600;
+            color: #FF6600;
+        }
+
+        .eth-diamond {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 14px solid rgba(255, 255, 255, 0.9);
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .eth-diamond::after {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: -8px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 14px solid rgba(255, 255, 255, 0.9);
+        }
+
+        #startGameBtn {
+            font-size: 28px;
+            padding: 20px 60px;
+            background: linear-gradient(135deg, #00ffff, #627EEA);
+            color: #000;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 30px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.4);
+        }
+
+        #startGameBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 255, 255, 0.6);
+        }
+
+        @media (max-width: 768px) {
+            .welcome-content {
+                margin: 20px;
+                padding: 25px 15px;
+                max-width: 95%;
+                border-radius: 15px;
+            }
+
+            .welcome-content h1 {
+                font-size: 36px;
+            }
+
+            .welcome-content h2 {
+                font-size: 18px;
+            }
+
+            .game-mechanics {
+                font-size: 14px;
+                max-width: 100%;
+            }
+
+            .mechanic {
+                font-size: 14px;
+            }
+
+            .powerup-indicator {
+                width: 35px;
+                height: 35px;
+            }
+
+            #startGameBtn {
+                font-size: 20px;
+                padding: 15px 40px;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
+    <div id="welcomeScreen">
+        <div class="welcome-content">
+            <h1>🏃 Run Vitalik, Run!</h1>
+
+            <div class="game-mechanics">
+                <div class="mechanic">
+                    <span style="font-size: 24px;">🎮</span>
+                    <span><strong>Dodge blocks</strong> from live blockchain networks and compete for the top score.</span>
+                </div>
+                <div class="mechanic">
+                    <span style="font-size: 24px;">💎</span>
+                    <span><strong>Collect ETH</strong> to increase your score</span>
+                </div>
+                <div class="mechanic">
+                    <div class="powerup-indicator green">
+                        <div class="eth-diamond"></div>
+                    </div>
+                    <span><strong>Green</strong> - Clear all blocks temporarily</span>
+                </div>
+                <div class="mechanic">
+                    <div class="powerup-indicator yellow">
+                        <div class="eth-diamond"></div>
+                    </div>
+                    <span><strong>Yellow</strong> - Attract coins magnetically</span>
+                </div>
+                <div class="mechanic">
+                    <div class="powerup-indicator orange">
+                        <div class="eth-diamond"></div>
+                    </div>
+                    <span><strong>Orange</strong> - Grow giant & smash through blocks!</span>
+                </div>
+            </div>
+
+            <button id="startGameBtn">Start Game</button>
+        </div>
+    </div>
+
     <div id="react-root"></div>
     <div id="ui">
         <div id="score">Score: 0</div>
@@ -522,7 +723,7 @@
         </a>
     </div>
 
-    <div id="mobileControls">
+    <div id="mobileControls" class="hidden">
         <div id="leftBtn" class="mobile-btn">◄</div>
         <div id="jumpBtn" class="mobile-btn">▲</div>
         <div id="rightBtn" class="mobile-btn">►</div>
