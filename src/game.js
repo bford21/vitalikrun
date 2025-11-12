@@ -33,6 +33,7 @@ let gameSpeed = 0.2;
 let score = 0;
 let ethCollected = 0;
 let obstaclesPassed = 0;
+let userRank = null; // Track user's leaderboard rank after submission
 let gameOver = false;
 let isJumping = false;
 let jumpVelocity = 0;
@@ -1420,6 +1421,7 @@ window.restartGame = function() {
     score = 0;
     ethCollected = 0;
     obstaclesPassed = 0;
+    userRank = null; // Reset rank
     gameSpeed = 0.2;
     gameOver = false;
     gameStarted = true; // Game is active again
@@ -1770,7 +1772,7 @@ async function submitScore() {
         statusDiv.style.color = '#ffff00';
 
         // Create message to sign
-        const message = `I scored ${score} points in Vitalik Run!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
+        const message = `I scored ${score} points in Running On Ethereum!\n\nScore: ${score}\nETH Collected: ${ethCollected}\nBlocks Passed: ${obstaclesPassed}`;
 
         // Sign message
         const signer = await provider.getSigner();
@@ -1820,6 +1822,7 @@ async function submitScore() {
                 submitBtn.textContent = 'Submit Score';
             } else {
                 // Score successfully submitted
+                userRank = result.rank; // Store rank for sharing
                 statusDiv.textContent = `✅ Score submitted! Your rank: #${result.rank}`;
                 statusDiv.style.color = '#00ff00';
                 submitBtn.style.display = 'none';
@@ -1993,9 +1996,12 @@ function closeLeaderboard() {
 
 // Share score
 async function shareScore() {
+    // Build rank text if available
+    const rankText = userRank ? `🏆 Rank: #${userRank}\n` : '';
+
     if (isFarcasterApp && window.farcasterContext) {
         // In Farcaster - use Farcaster mini app URL
-        const farcasterShareText = `I just scored ${score} points in Vitalik Run! 🏃\n\n💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nhttps://farcaster.xyz/miniapps/STldiUAWgnc4/running-on-ethereum`;
+        const farcasterShareText = `I just scored ${score} points in Running On Ethereum! 🏃\n\n${rankText}💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nhttps://farcaster.xyz/miniapps/STldiUAWgnc4/running-on-ethereum`;
 
         try {
             const { sdk } = await import('@farcaster/miniapp-sdk');
@@ -2007,12 +2013,12 @@ async function shareScore() {
         } catch (error) {
             console.error('Failed to open Farcaster composer:', error);
             // Fallback to Twitter
-            const twitterShareText = `I just scored ${score} points in Vitalik Run! 🏃\n\n💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nPlay now: https://runvitalik.run`;
+            const twitterShareText = `I just scored ${score} points in Running On Ethereum! 🏃\n\n${rankText}💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nPlay now: https://runvitalik.run`;
             openTwitterShare(twitterShareText);
         }
     } else {
         // On regular web - use Twitter/X with regular URL
-        const twitterShareText = `I just scored ${score} points in Vitalik Run! 🏃\n\n💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nPlay now: https://runvitalik.run`;
+        const twitterShareText = `I just scored ${score} points in Running On Ethereum! 🏃\n\n${rankText}💎 ${ethCollected} ETH collected\n📦 ${obstaclesPassed} blocks dodged\n\nPlay now: https://runvitalik.run`;
         openTwitterShare(twitterShareText);
     }
 }

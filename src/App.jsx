@@ -113,7 +113,7 @@ export default function App() {
             modalSize="compact"
             initialChain={config.chains[0]}
             appInfo={{
-              appName: 'Vitalik Run',
+              appName: 'Running On Ethereum',
               learnMoreUrl: 'https://github.com/bford21/vitalikrun',
               disclaimer: () => (
                 <div style={{ padding: '10px', fontSize: '12px', color: '#888', textAlign: 'center' }}>

@@ -18,7 +18,7 @@ export const config = createConfig({
       }
     }),
     coinbaseWallet({
-      appName: 'Vitalik Run',
+      appName: 'Running On Ethereum',
       appLogoUrl: undefined
     })
   ],
