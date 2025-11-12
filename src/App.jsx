@@ -16,19 +16,30 @@ function GameContainer() {
 
   // Auto-connect Farcaster wallet when in Farcaster app
   useEffect(() => {
-    if (isFarcaster && !isConnected && !isLoading) {
+    if (isFarcaster && !isConnected && !isLoading && connectors.length > 0) {
       console.log('🟣 Attempting to auto-connect Farcaster wallet...');
       console.log('🟣 Available connectors:', connectors.map(c => ({ id: c.id, name: c.name, type: c.type })));
 
       const farcasterConnector = connectors.find(c => c.id === 'farcaster');
       if (farcasterConnector) {
         console.log('🟣 Found Farcaster connector:', farcasterConnector);
-        try {
-          connect({ connector: farcasterConnector });
-          console.log('🟣 Connect called successfully');
-        } catch (error) {
-          console.error('❌ Failed to connect:', error);
-        }
+
+        // Small delay to ensure SDK is fully initialized
+        setTimeout(() => {
+          console.log('🟣 Calling connect with Farcaster connector...');
+          connect(
+            { connector: farcasterConnector },
+            {
+              onSuccess: (data) => {
+                console.log('✅ Farcaster wallet connected successfully:', data);
+              },
+              onError: (error) => {
+                console.error('❌ Failed to connect Farcaster wallet:', error);
+                console.error('Error details:', error.message, error.stack);
+              },
+            }
+          );
+        }, 500);
       } else {
         console.log('⚠️ Farcaster connector not found. Available:', connectors.map(c => c.id));
       }
@@ -42,6 +53,15 @@ function GameContainer() {
     window.openWalletModal = openConnectModal;
     window.isFarcasterApp = isFarcaster;
 
+    // Expose Farcaster connect function
+    window.connectFarcasterWallet = () => {
+      const farcasterConnector = connectors.find(c => c.id === 'farcaster');
+      if (farcasterConnector) {
+        console.log('🟣 Manually connecting Farcaster wallet...');
+        connect({ connector: farcasterConnector });
+      }
+    };
+
     console.log('Wallet state update:', {
       address,
       isConnected,
@@ -52,7 +72,7 @@ function GameContainer() {
     window.dispatchEvent(new CustomEvent('walletChange', {
       detail: { address, isConnected, isFarcaster }
     }));
-  }, [address, isConnected, openConnectModal, isFarcaster]);
+  }, [address, isConnected, openConnectModal, isFarcaster, connect, connectors]);
 
   return null;
 }

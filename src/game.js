@@ -1919,8 +1919,11 @@ function toggleMute() {
 document.getElementById('muteBtn').addEventListener('click', toggleMute);
 document.getElementById('submitScoreBtn').addEventListener('click', submitScore);
 document.getElementById('connectWalletGameOverBtn').addEventListener('click', () => {
-    // Open RainbowKit modal via exposed function
-    if (window.openWalletModal) {
+    // Use Farcaster connect if in Farcaster app, otherwise open RainbowKit modal
+    if (isFarcasterApp && window.connectFarcasterWallet) {
+        console.log('🟣 User clicked Connect Wallet in Farcaster');
+        window.connectFarcasterWallet();
+    } else if (window.openWalletModal) {
         window.openWalletModal();
     }
 });
@@ -1943,15 +1946,16 @@ function updateGameOverUI() {
         connectWalletBtn.style.display = 'none';
         statusDiv.textContent = '';
     } else if (isFarcasterApp) {
-        // In Farcaster but wallet not connected - show message
+        // In Farcaster but wallet not connected - show connect button
         submitBtn.style.display = 'none';
-        connectWalletBtn.style.display = 'none';
-        statusDiv.textContent = 'Connecting Farcaster wallet...';
-        statusDiv.style.color = '#ffff00';
+        connectWalletBtn.style.display = 'inline-block';
+        connectWalletBtn.textContent = 'Connect Wallet';
+        statusDiv.textContent = '';
     } else {
         // Regular web browser - show connect wallet button
         submitBtn.style.display = 'none';
         connectWalletBtn.style.display = 'inline-block';
+        connectWalletBtn.textContent = 'Connect Wallet';
         statusDiv.textContent = '';
     }
 }
