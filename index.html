@@ -417,6 +417,15 @@
                 margin-bottom: 8px;
             }
 
+            /* Stack buttons vertically on mobile */
+            #gameOverContent > div > div > div {
+                flex-direction: column !important;
+            }
+
+            #gameOverContent > div > div > div > button {
+                width: 100% !important;
+            }
+
             /* Leaderboard modal mobile styling */
             #leaderboardModal > div {
                 margin: 20px auto;
@@ -761,13 +770,13 @@
                         <span style="color: #FF6B6B;">📦 Blocks Passed:</span> <span id="obstaclesCount">0</span> × 100 = <span id="obstaclesPoints">0</span>
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 500px; margin-bottom: 15px;">
-                    <div style="display: flex; gap: 10px;">
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; width: 100%;">
                         <button id="submitScoreBtn" style="display: none; flex: 1;">Submit Score</button>
                         <button id="connectWalletGameOverBtn" style="display: none; flex: 1;">Connect Wallet</button>
                         <button onclick="restartGame()" style="flex: 1;">Play Again</button>
                     </div>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; width: 100%;">
                         <button id="shareScoreBtn" style="flex: 1;">📤 Share</button>
                         <button id="leaderboardBtn" style="flex: 1;">🏆 Leaderboard</button>
                     </div>
