@@ -1,6 +1,6 @@
 # Running On Ethereum
 
-Web3 endless runner game with real-time blockchain data.
+Endless runner game with real-time blockchain blocks. Dodge blocks from live Ethereum networks, collect ETH, and compete for the top score!
 
 **Play now**: https://runvitalik.run
 

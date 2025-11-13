@@ -7,7 +7,7 @@
     <title>Running On Ethereum</title>
 
     <!-- Farcaster Mini App Metadata -->
-    <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://runvitalik.run/splash.png","button":{"title":"🏃 Play Game","action":{"type":"launch_miniapp","name":"Vitalik Run","url":"https://runvitalik.run","splashImageUrl":"https://runvitalik.run/splash.png","splashBackgroundColor":"#87CEEB"}}}' />
+    <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://runvitalik.run/splash.png","button":{"title":"🏃 Play Game","action":{"type":"launch_miniapp","name":"Running On Ethereum","url":"https://runvitalik.run","splashImageUrl":"https://runvitalik.run/splash.png","splashBackgroundColor":"#87CEEB"}}}' />
     <meta name="fc:frame" content="vNext">
     <meta name="fc:frame:image" content="https://runvitalik.run/og-image.png">
     <meta name="fc:frame:button:1" content="Play Game">
@@ -702,7 +702,7 @@
                             </svg>
                         </div>
                     </div>
-                    <span><strong>Green</strong> - Clear all blocks temporarily</span>
+                    <span>Clears all blocks temporarily</span>
                 </div>
                 <div class="mechanic">
                     <div class="powerup-indicator cyan">
@@ -713,7 +713,7 @@
                             </svg>
                         </div>
                     </div>
-                    <span><strong>Cyan</strong> - Attract coins magnetically</span>
+                    <span>Attracts coins magnetically</span>
                 </div>
                 <div class="mechanic">
                     <div class="powerup-indicator magenta">
@@ -724,7 +724,7 @@
                             </svg>
                         </div>
                     </div>
-                    <span><strong>Magenta</strong> - Grow giant & smash through blocks!</span>
+                    <span>Grow 2x in size & smash through blocks</span>
                 </div>
             </div>
 
@@ -761,15 +761,15 @@
                         <span style="color: #FF6B6B;">📦 Blocks Passed:</span> <span id="obstaclesCount">0</span> × 100 = <span id="obstaclesPoints">0</span>
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-bottom: 15px;">
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-                        <button id="submitScoreBtn" style="display: none;">Submit Score</button>
-                        <button id="connectWalletGameOverBtn" style="display: none;">Connect Wallet</button>
-                        <button onclick="restartGame()">Play Again</button>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 500px; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button id="submitScoreBtn" style="display: none; flex: 1;">Submit Score</button>
+                        <button id="connectWalletGameOverBtn" style="display: none; flex: 1;">Connect Wallet</button>
+                        <button onclick="restartGame()" style="flex: 1;">Play Again</button>
                     </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-                        <button id="shareScoreBtn">📤 Share</button>
-                        <button id="leaderboardBtn">🏆 Leaderboard</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="shareScoreBtn" style="flex: 1;">📤 Share</button>
+                        <button id="leaderboardBtn" style="flex: 1;">🏆 Leaderboard</button>
                     </div>
                 </div>
                 <div id="submissionStatus" style="font-size: 14px; margin-top: 10px;"></div>

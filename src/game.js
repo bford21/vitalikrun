@@ -705,7 +705,7 @@ function update(deltaTime) {
     document.getElementById('score').textContent = `Score: ${score}`;
 
     // Increase speed over time - game gets progressively harder
-    gameSpeed += 0.0003;
+    gameSpeed += 0.00015;
 
     // Move active player towards target lane
     const targetX = lanes[currentLane];
